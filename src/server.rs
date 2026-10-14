@@ -40,14 +40,17 @@ pub async fn build_state(
     // certificate-workload calls fail-closed until the map loads. The
     // load presents THIS service's certificate identity over the Valkey
     // TLS plane (group DESIGN.md §3.1).
-    let workload_registry =
-        match sentin8::auth::workload_registry::WorkloadMap::boot_load("sentin8:sys").await {
-            Ok(map) => map,
-            Err(e) => {
-                tracing::warn!(error = %e, "sys: workload registry map unavailable at boot — certificate-workload calls fail-closed until next boot");
-                sentin8::auth::workload_registry::WorkloadMap::boot_load_empty("sentin8:sys")
-            }
-        };
+    let workload_registry = match sentin8::auth::workload_registry::WorkloadMap::boot_load(
+        "sentin8:sys",
+    )
+    .await
+    {
+        Ok(map) => map,
+        Err(e) => {
+            tracing::warn!(error = %e, "sys: workload registry map unavailable at boot — certificate-workload calls fail-closed until next boot");
+            sentin8::auth::workload_registry::WorkloadMap::boot_load_empty("sentin8:sys")
+        }
+    };
 
     let state = AppState {
         config: Arc::new(config.clone()),
@@ -210,7 +213,6 @@ pub fn routes(
             "/v1/audit",
             get(handlers::list_audit).post(handlers::ingest_audit),
         )
-
         // Traffic counter — counts every inbound request (excludes health checks).
         // ── Sentin8:Policy admin API ( — shared implementation,
         // one surface per service; handlers are generic over this AppState).

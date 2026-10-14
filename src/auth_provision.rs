@@ -34,12 +34,9 @@ impl AuthProvisioner {
     pub async fn connect() -> anyhow::Result<Self> {
         let issuer = sentin8::config::Sentin8Config::from_env().sentin8_auth_issuer();
         let ca_cert_path = sentin8::auth::m2m::platform_ca_path();
-        let cert = sentin8::auth::m2m::ensure_workload_certificate(
-            &issuer,
-            "sentin8:sys",
-            &ca_cert_path,
-        )
-        .await?;
+        let cert =
+            sentin8::auth::m2m::ensure_workload_certificate(&issuer, "sentin8:sys", &ca_cert_path)
+                .await?;
         let mtls = sentin8::middleware::mtls::MtlsConfig::new(
             &cert.ca_cert_path,
             &cert.cert_path,
@@ -65,10 +62,7 @@ impl AuthProvisioner {
     /// the header is omitted and auth resolves SYSTEM env defaults.
     async fn post(&self, path: &str, body: serde_json::Value) -> anyhow::Result<serde_json::Value> {
         let url = format!("{}{}", self.auth_url, path);
-        let mut req = self
-            .http
-            .post(&url)
-            .json(&body);
+        let mut req = self.http.post(&url).json(&body);
         if let Some(env_id) = body.get("env_id").and_then(|v| v.as_str()) {
             if !env_id.is_empty() {
                 req = req.header("x-sentin8-target-env-id", env_id);
@@ -89,11 +83,7 @@ impl AuthProvisioner {
     /// env-scoped, same rule as `post`'s header).
     async fn get(&self, path: &str, env_id: uuid::Uuid) -> anyhow::Result<serde_json::Value> {
         let url = format!("{}{}?target_env_id={}", self.auth_url, path, env_id);
-        let resp = self
-            .http
-            .get(&url)
-            .send()
-            .await?;
+        let resp = self.http.get(&url).send().await?;
         let status = resp.status();
         let text = resp.text().await.unwrap_or_default();
         if !status.is_success() {

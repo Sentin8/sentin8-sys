@@ -50,8 +50,8 @@ pub async fn verify(
     let has_bearer =
         headers.contains_key(http::header::AUTHORIZATION) || headers.contains_key("authorization");
     if !has_bearer {
-        if let Some(workload) = sentin8::auth::client::resolve_workload_identity(registry, headers)
-            .await?
+        if let Some(workload) =
+            sentin8::auth::client::resolve_workload_identity(registry, headers).await?
         {
             let tls = sentin8::middleware::context::TLSContext::from_headers(headers);
             return Ok(AuthContext::from_workload(workload, tls.env_id));

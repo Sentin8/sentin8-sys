@@ -774,7 +774,7 @@ pub async fn create_org(
     // the same connection (sys design ). The org.created event joins
     // this same transaction (inbox-first).
     let mut tx = state.pool.begin().await.map_err(err_db)?;
-    set_rls_context(&mut *tx, sentin8::config::SYSTEM_ENV_ID).await;
+    set_rls_context(&mut tx, sentin8::config::SYSTEM_ENV_ID).await;
     let org_id = match sqlx::query_as::<_, OrgRow>(
         r#"INSERT INTO organizations (slug, display_name, domain)
                VALUES ($1, $2, $3)
@@ -797,12 +797,12 @@ pub async fn create_org(
             return Err(err_db(e));
         }
     };
-    set_rls_context(&mut *tx, sentin8::config::SYSTEM_ENV_ID).await;
+    set_rls_context(&mut tx, sentin8::config::SYSTEM_ENV_ID).await;
     // VDC-3 (design/sentin8-vertical-data-plane-contract.md §VDC.4): the
     // org lifecycle envelope is a payload-complete tenant snapshot —
     // consumers (vertical env-init, caches) act without a lookup.
     emit_sentin8_sys_event_tx(
-        &mut *tx,
+        &mut tx,
         sentin8::config::SYSTEM_ENV_ID,
         "sentin8:sys:org:created",
         serde_json::json!({
@@ -911,7 +911,7 @@ pub async fn list_orgs(
     // `sentin8_context_initialized` — both branches read inside a
     // transaction whose context covers the catalog view.
     let mut tx = state.pool.begin().await.map_err(err_db)?;
-    set_rls_context(&mut *tx, a.claims.env_uuid()).await;
+    set_rls_context(&mut tx, a.claims.env_uuid()).await;
     let rows = if a.is_platform_admin() {
         sqlx::query_as::<_, OrgRow>(
             r#"SELECT id, slug, display_name, status, domain, created_at
@@ -1058,7 +1058,7 @@ pub async fn update_org(
     .ok_or_else(not_found)?;
 
     let mut tx = state.pool.begin().await.map_err(err_db)?;
-    set_rls_context(&mut *tx, sentin8::config::SYSTEM_ENV_ID).await;
+    set_rls_context(&mut tx, sentin8::config::SYSTEM_ENV_ID).await;
     let row = sqlx::query_as::<_, OrgRow>(
         r#"UPDATE organizations
            SET display_name = COALESCE($2, display_name),
@@ -1077,7 +1077,7 @@ pub async fn update_org(
     .map_err(err_db)?;
 
     audit_tx(
-        &mut *tx,
+        &mut tx,
         &a,
         "update",
         "organization",
@@ -1088,10 +1088,10 @@ pub async fn update_org(
     .await;
 
     // Stories — emit sys.org.updated to system org/env, same tx.
-    set_rls_context(&mut *tx, sentin8::config::SYSTEM_ENV_ID).await;
+    set_rls_context(&mut tx, sentin8::config::SYSTEM_ENV_ID).await;
     // VDC-3: payload-complete org snapshot (see the org:created emit).
     emit_sentin8_sys_event_tx(
-        &mut *tx,
+        &mut tx,
         sentin8::config::SYSTEM_ENV_ID,
         "sentin8:sys:org:updated",
         serde_json::json!({
@@ -1147,7 +1147,7 @@ pub async fn archive_org(
     authorize_org(&a, id, &state.pool).await?;
 
     let mut tx = state.pool.begin().await.map_err(err_db)?;
-    set_rls_context(&mut *tx, sentin8::config::SYSTEM_ENV_ID).await;
+    set_rls_context(&mut tx, sentin8::config::SYSTEM_ENV_ID).await;
     let res = sqlx::query("UPDATE organizations SET status = 'archived', updated_at = now() WHERE id = $1 AND status <> 'archived'")
         .bind(id)
         .execute(&mut *tx)
@@ -1157,7 +1157,7 @@ pub async fn archive_org(
         return Err(not_found());
     }
     audit_tx(
-        &mut *tx,
+        &mut tx,
         &a,
         "archive",
         "organization",
@@ -1167,9 +1167,9 @@ pub async fn archive_org(
     )
     .await;
     // Stories — emit sys.org.archived, same tx.
-    set_rls_context(&mut *tx, sentin8::config::SYSTEM_ENV_ID).await;
+    set_rls_context(&mut tx, sentin8::config::SYSTEM_ENV_ID).await;
     emit_sentin8_sys_event_tx(
-        &mut *tx,
+        &mut tx,
         sentin8::config::SYSTEM_ENV_ID,
         "sentin8:sys:org:archived",
         serde_json::json!({ "org_id": id }),
@@ -1209,7 +1209,7 @@ pub async fn delete_org(
     .await?;
 
     let mut tx = state.pool.begin().await.map_err(err_db)?;
-    set_rls_context(&mut *tx, sentin8::config::SYSTEM_ENV_ID).await;
+    set_rls_context(&mut tx, sentin8::config::SYSTEM_ENV_ID).await;
     // Cascade children.
     sqlx::query("DELETE FROM branding WHERE org_id = $1")
         .bind(id)
@@ -1317,7 +1317,7 @@ pub async fn delete_org(
         return Err(not_found());
     }
     audit_tx(
-        &mut *tx,
+        &mut tx,
         &a,
         "delete",
         "organization",
@@ -1327,9 +1327,9 @@ pub async fn delete_org(
     )
     .await;
     // Stories — emit sys.org.deleted, same tx.
-    set_rls_context(&mut *tx, sentin8::config::SYSTEM_ENV_ID).await;
+    set_rls_context(&mut tx, sentin8::config::SYSTEM_ENV_ID).await;
     emit_sentin8_sys_event_tx(
-        &mut *tx,
+        &mut tx,
         sentin8::config::SYSTEM_ENV_ID,
         "sentin8:sys:org:deleted",
         serde_json::json!({ "org_id": id }),
@@ -1429,7 +1429,7 @@ pub async fn create_env(
     // the same connection (sys design ). The env.created event joins
     // this same transaction (inbox-first).
     let mut tx = state.pool.begin().await.map_err(err_db)?;
-    set_rls_context(&mut *tx, sentin8::config::SYSTEM_ENV_ID).await;
+    set_rls_context(&mut tx, sentin8::config::SYSTEM_ENV_ID).await;
     let row = match sqlx::query_as::<_, EnvRow>(
         r#"INSERT INTO environments (org_id, slug, display_name)
            VALUES ($1, $2, $3)
@@ -1452,7 +1452,7 @@ pub async fn create_env(
             return Err(err_db(e));
         }
     };
-    set_rls_context(&mut *tx, sentin8::config::SYSTEM_ENV_ID).await;
+    set_rls_context(&mut tx, sentin8::config::SYSTEM_ENV_ID).await;
     // VDC-3 (design/sentin8-vertical-data-plane-contract.md §VDC.4): the
     // env lifecycle envelope is a payload-complete tenant snapshot —
     // org + env identity so consumers (fdx provider-profile derivation,
@@ -1468,7 +1468,7 @@ pub async fn create_env(
         .map(|(s, n, d)| (Some(s), Some(n), Some(d)))
         .unwrap_or((None, None, None));
     emit_sentin8_sys_event_tx(
-        &mut *tx,
+        &mut tx,
         sentin8::config::SYSTEM_ENV_ID,
         "sentin8:sys:env:created",
         serde_json::json!({
@@ -1563,7 +1563,7 @@ pub async fn list_envs(
 
         // (PG18 GUC rule): the env read rides a context transaction.
         let mut tx = state.pool.begin().await.map_err(err_db)?;
-        set_rls_context(&mut *tx, a.claims.env_uuid()).await;
+        set_rls_context(&mut tx, a.claims.env_uuid()).await;
         let rows = sqlx::query_as::<_, EnvRow>(
             r#"SELECT id, org_id, slug, display_name, status, auth_domain, created_at
                FROM environments
@@ -1596,7 +1596,7 @@ pub async fn list_envs(
     // (PG18 GUC rule): both branches read inside a context transaction
     // (sys.environments is FORCE-RLS'd on sentin8_context_initialized).
     let mut tx = state.pool.begin().await.map_err(err_db)?;
-    set_rls_context(&mut *tx, a.claims.env_uuid()).await;
+    set_rls_context(&mut tx, a.claims.env_uuid()).await;
     let rows = if a.is_platform_admin() {
         sqlx::query_as::<_, EnvRow>(
             r#"SELECT id, org_id, slug, display_name, status, auth_domain, created_at
@@ -1682,7 +1682,7 @@ pub async fn get_env(
     // sys_environments_select admits `id = app.env_id`, and a bare-pool read
     // (context evaporated with resolve_org_id's tx) sees zero rows → 404.
     let mut tx = state.pool.begin().await.map_err(err_db)?;
-    set_rls_context(&mut *tx, env_id).await;
+    set_rls_context(&mut tx, env_id).await;
     let row = sqlx::query_as::<_, EnvRow>(
         r#"SELECT id, org_id, slug, display_name, status, auth_domain, created_at
            FROM environments WHERE id = $1"#,
@@ -1770,7 +1770,7 @@ pub async fn update_env(
             .to_string()
     });
     let mut tx = state.pool.begin().await.map_err(err_db)?;
-    set_rls_context(&mut *tx, env_id).await;
+    set_rls_context(&mut tx, env_id).await;
     let row = sqlx::query_as::<_, EnvRow>(
         r#"UPDATE environments
            SET display_name = COALESCE($2, display_name),
@@ -1790,7 +1790,7 @@ pub async fn update_env(
     .ok_or_else(not_found)?;
 
     audit_tx(
-        &mut *tx,
+        &mut tx,
         &a,
         "update",
         "environment",
@@ -1801,7 +1801,7 @@ pub async fn update_env(
     .await;
 
     // Stories — emit sys.env.updated, same tx.
-    set_rls_context(&mut *tx, sentin8::config::SYSTEM_ENV_ID).await;
+    set_rls_context(&mut tx, sentin8::config::SYSTEM_ENV_ID).await;
     // VDC-3: payload-complete env snapshot (see the env:created emit).
     let org_snapshot: Option<(String, String, String)> =
         sqlx::query_as(r#"SELECT slug, display_name, domain FROM organizations WHERE id = $1"#)
@@ -1814,7 +1814,7 @@ pub async fn update_env(
         .map(|(s, n, d)| (Some(s), Some(n), Some(d)))
         .unwrap_or((None, None, None));
     emit_sentin8_sys_event_tx(
-        &mut *tx,
+        &mut tx,
         sentin8::config::SYSTEM_ENV_ID,
         "sentin8:sys:env:updated",
         serde_json::json!({
@@ -1896,7 +1896,7 @@ pub async fn archive_env(
     authorize_org(&a, org_id, &state.pool).await?;
 
     let mut tx = state.pool.begin().await.map_err(err_db)?;
-    set_rls_context(&mut *tx, env_id).await;
+    set_rls_context(&mut tx, env_id).await;
     let res = sqlx::query(
         "UPDATE environments SET status = 'archived', updated_at = now() WHERE id = $1 AND status <> 'archived'",
     )
@@ -1908,7 +1908,7 @@ pub async fn archive_env(
         return Err(not_found());
     }
     audit_tx(
-        &mut *tx,
+        &mut tx,
         &a,
         "archive",
         "environment",
@@ -1919,7 +1919,7 @@ pub async fn archive_env(
     .await;
     // Stories — emit sys.env.archived, same tx.
     emit_sentin8_sys_event_tx(
-        &mut *tx,
+        &mut tx,
         env_id,
         "sentin8:sys:env:archived",
         serde_json::json!({ "env_id": env_id }),
@@ -1961,7 +1961,7 @@ pub async fn delete_env(
     authorize_org(&a, org_id, &state.pool).await?;
 
     let mut tx = state.pool.begin().await.map_err(err_db)?;
-    set_rls_context(&mut *tx, env_id).await;
+    set_rls_context(&mut tx, env_id).await;
     sqlx::query("DELETE FROM branding WHERE env_id = $1")
         .bind(env_id)
         .execute(&mut *tx)
@@ -2033,7 +2033,7 @@ pub async fn delete_env(
         return Err(not_found());
     }
     audit_tx(
-        &mut *tx,
+        &mut tx,
         &a,
         "delete",
         "environment",
@@ -2044,7 +2044,7 @@ pub async fn delete_env(
     .await;
     // Stories — emit sys.env.deleted, same tx.
     emit_sentin8_sys_event_tx(
-        &mut *tx,
+        &mut tx,
         env_id,
         "sentin8:sys:env:deleted",
         serde_json::json!({ "env_id": env_id }),
@@ -2117,7 +2117,7 @@ pub async fn list_services(
     // bare-pool read (context evaporated with resolve_org_id's tx) sees zero
     // rows.
     let mut tx = state.pool.begin().await.map_err(err_db)?;
-    set_rls_context(&mut *tx, env_id).await;
+    set_rls_context(&mut tx, env_id).await;
     let rows = sqlx::query(
         r#"SELECT id, service, enabled, config FROM services
            WHERE org_id = $1 AND env_id = $2 ORDER BY service"#,
@@ -2174,7 +2174,7 @@ pub async fn set_service(
     authorize_org(&a, org_id, &state.pool).await?;
 
     let mut tx = state.pool.begin().await.map_err(err_db)?;
-    set_rls_context(&mut *tx, env_id).await;
+    set_rls_context(&mut tx, env_id).await;
     let row = sqlx::query(
         r#"INSERT INTO services (org_id, env_id, service, enabled, config)
            VALUES ($1, $2, $3, $4, $5)
@@ -2192,7 +2192,7 @@ pub async fn set_service(
     .map_err(err_db)?;
 
     audit_tx(
-        &mut *tx,
+        &mut tx,
         &a,
         "update",
         "service",
@@ -2212,9 +2212,9 @@ pub async fn set_service(
     // inbox INSERT policy requires row env_id = app.env_id, so re-set
     // the context to the system env for this emit (it is the last write
     // in the transaction).
-    set_rls_context(&mut *tx, sentin8::config::SYSTEM_ENV_ID).await;
+    set_rls_context(&mut tx, sentin8::config::SYSTEM_ENV_ID).await;
     emit_sentin8_sys_event_tx(
-        &mut *tx,
+        &mut tx,
         sentin8::config::SYSTEM_ENV_ID,
         "sentin8:sys:service:updated",
         serde_json::json!({
@@ -2309,7 +2309,7 @@ pub async fn create_application(
     }
 
     let mut tx = state.pool.begin().await.map_err(err_db)?;
-    set_rls_context(&mut *tx, env_id).await;
+    set_rls_context(&mut tx, env_id).await;
     let row = sqlx::query(
         r#"INSERT INTO app_environment_bindings (org_id, env_id, application_id, name, slug, type)
            VALUES ($1, $2, gen_random_uuid(), $3, $4, $5)
@@ -2335,7 +2335,7 @@ pub async fn create_application(
 
     let id: Uuid = row.get("application_id");
     audit_tx(
-        &mut *tx,
+        &mut tx,
         &a,
         "create",
         "application",
@@ -2346,7 +2346,7 @@ pub async fn create_application(
     .await;
     // Stories — emit sys.app.created, same tx.
     emit_sentin8_sys_event_tx(
-        &mut *tx,
+        &mut tx,
         env_id,
         "sentin8:sys:app:created",
         serde_json::json!({ "env_id": env_id, "application_id": id }),
@@ -2507,7 +2507,7 @@ pub async fn update_application(
     let status: Option<String> = req.get("status").and_then(|v| v.as_str()).map(String::from);
 
     let mut tx = state.pool.begin().await.map_err(err_db)?;
-    set_rls_context(&mut *tx, env_id).await;
+    set_rls_context(&mut tx, env_id).await;
     let row = sqlx::query(
         r#"UPDATE app_environment_bindings
            SET name = COALESCE($3, name),
@@ -2526,7 +2526,7 @@ pub async fn update_application(
     .ok_or_else(not_found)?;
 
     audit_tx(
-        &mut *tx,
+        &mut tx,
         &a,
         "update",
         "application",
@@ -2537,7 +2537,7 @@ pub async fn update_application(
     .await;
     // Stories — emit sys.app.updated, same tx.
     emit_sentin8_sys_event_tx(
-        &mut *tx,
+        &mut tx,
         env_id,
         "sentin8:sys:app:updated",
         serde_json::json!({ "env_id": env_id, "application_id": app_id }),
@@ -2587,7 +2587,7 @@ pub async fn archive_application(
     authorize_org(&a, org_id, &state.pool).await?;
 
     let mut tx = state.pool.begin().await.map_err(err_db)?;
-    set_rls_context(&mut *tx, env_id).await;
+    set_rls_context(&mut tx, env_id).await;
     let res = sqlx::query(
         "UPDATE app_environment_bindings SET status = 'archived', updated_at = now() WHERE env_id = $1 AND application_id = $2",
     )
@@ -2600,7 +2600,7 @@ pub async fn archive_application(
         return Err(not_found());
     }
     audit_tx(
-        &mut *tx,
+        &mut tx,
         &a,
         "archive",
         "application",
@@ -2611,7 +2611,7 @@ pub async fn archive_application(
     .await;
     // Stories — emit sys.app.archived, same tx.
     emit_sentin8_sys_event_tx(
-        &mut *tx,
+        &mut tx,
         env_id,
         "sentin8:sys:app:archived",
         serde_json::json!({ "env_id": env_id, "application_id": app_id }),
@@ -2690,7 +2690,7 @@ pub async fn create_binding(
     authorize_org(&a, org_id, &state.pool).await?;
 
     let mut tx = state.pool.begin().await.map_err(err_db)?;
-    set_rls_context(&mut *tx, env_id).await;
+    set_rls_context(&mut tx, env_id).await;
     let row = sqlx::query(
         r#"INSERT INTO app_environment_bindings (org_id, env_id, application_id, name, slug, type)
            VALUES ($1, $2, $3, $4, $5, $6)
@@ -2716,7 +2716,7 @@ pub async fn create_binding(
     })?;
 
     audit_tx(
-        &mut *tx,
+        &mut tx,
         &a,
         "create",
         "binding",
@@ -2727,7 +2727,7 @@ pub async fn create_binding(
     .await;
     // Stories — emit sys.binding.created, same tx.
     emit_sentin8_sys_event_tx(
-        &mut *tx,
+        &mut tx,
         env_id,
         "sentin8:sys:binding:created",
         serde_json::json!({ "env_id": env_id, "binding_id": row.get::<Uuid, _>("id") }),
@@ -2833,7 +2833,7 @@ pub async fn delete_binding(
     authorize_org(&a, org_id, &state.pool).await?;
 
     let mut tx = state.pool.begin().await.map_err(err_db)?;
-    set_rls_context(&mut *tx, env_id).await;
+    set_rls_context(&mut tx, env_id).await;
     let res = sqlx::query("DELETE FROM app_environment_bindings WHERE id = $1 AND env_id = $2")
         .bind(binding_id)
         .bind(env_id)
@@ -2844,7 +2844,7 @@ pub async fn delete_binding(
         return Err(not_found());
     }
     audit_tx(
-        &mut *tx,
+        &mut tx,
         &a,
         "delete",
         "binding",
@@ -2855,7 +2855,7 @@ pub async fn delete_binding(
     .await;
     // Stories — emit sys.binding.deleted, same tx.
     emit_sentin8_sys_event_tx(
-        &mut *tx,
+        &mut tx,
         env_id,
         "sentin8:sys:binding:deleted",
         serde_json::json!({ "env_id": env_id, "binding_id": binding_id }),
@@ -3028,7 +3028,7 @@ pub async fn remove_membership(
         ))?;
 
     let mut tx = state.pool.begin().await.map_err(err_db)?;
-    set_rls_context(&mut *tx, sentin8::config::SYSTEM_ENV_ID).await;
+    set_rls_context(&mut tx, sentin8::config::SYSTEM_ENV_ID).await;
     // Remove all role assignments for this user in envs that belong to the target org.
     let _ = sqlx::query(
         r#"DELETE FROM user_roles
@@ -3072,7 +3072,7 @@ pub async fn remove_membership(
     .map_err(err_db)?;
 
     audit_tx(
-        &mut *tx,
+        &mut tx,
         &a,
         "delete",
         "membership",
@@ -3082,9 +3082,9 @@ pub async fn remove_membership(
     )
     .await;
     // Stories — emit sys.membership.removed, same tx.
-    set_rls_context(&mut *tx, sentin8::config::SYSTEM_ENV_ID).await;
+    set_rls_context(&mut tx, sentin8::config::SYSTEM_ENV_ID).await;
     emit_sentin8_sys_event_tx(
-        &mut *tx,
+        &mut tx,
         sentin8::config::SYSTEM_ENV_ID,
         "sentin8:sys:membership:removed",
         serde_json::json!({ "org_id": org_id, "user_id": user_id }),
@@ -3128,7 +3128,7 @@ pub async fn list_invitations(
     // be set inside an explicit transaction; on an autocommit connection
     // it evaporates before the query runs.
     let mut conn = state.pool.begin().await.map_err(err_db)?;
-    set_rls_context(&mut *conn, sentin8::config::SYSTEM_ENV_ID).await;
+    set_rls_context(&mut conn, sentin8::config::SYSTEM_ENV_ID).await;
     let rows = sqlx::query(
         r#"SELECT id, org_id, email, role, status, token, expires_at
            FROM invitations WHERE org_id = $1
@@ -3185,7 +3185,7 @@ pub async fn revoke_invitation(
     .await?;
 
     let mut tx = state.pool.begin().await.map_err(err_db)?;
-    set_rls_context(&mut *tx, sentin8::config::SYSTEM_ENV_ID).await;
+    set_rls_context(&mut tx, sentin8::config::SYSTEM_ENV_ID).await;
     let res = sqlx::query(
         "UPDATE invitations SET status = 'revoked' WHERE id = $1 AND status = 'pending'",
     )
@@ -3200,7 +3200,7 @@ pub async fn revoke_invitation(
         ));
     }
     audit_tx(
-        &mut *tx,
+        &mut tx,
         &a,
         "revoke",
         "invitation",
@@ -3210,7 +3210,7 @@ pub async fn revoke_invitation(
     )
     .await;
     emit_sentin8_sys_event_tx(
-        &mut *tx,
+        &mut tx,
         sentin8::config::SYSTEM_ENV_ID,
         "sentin8:sys:invitation:revoked",
         serde_json::json!({ "invitation_id": id }),
@@ -3255,7 +3255,7 @@ pub async fn send_invitation(
     let expires_at = chrono::Utc::now() + chrono::Duration::days(7);
 
     let mut tx = state.pool.begin().await.map_err(err_db)?;
-    set_rls_context(&mut *tx, sentin8::config::SYSTEM_ENV_ID).await;
+    set_rls_context(&mut tx, sentin8::config::SYSTEM_ENV_ID).await;
     let row = sqlx::query(
         r#"INSERT INTO invitations (org_id, email, role, token, expires_at)
            VALUES ($1, $2, $3, $4, $5)
@@ -3271,7 +3271,7 @@ pub async fn send_invitation(
     .map_err(err_db)?;
 
     audit_tx(
-        &mut *tx,
+        &mut tx,
         &a,
         "create",
         "invitation",
@@ -3285,16 +3285,16 @@ pub async fn send_invitation(
     // post_outbox row carries the ORG's env under the caller's (already
     // set) context — same-context INSERT passes RLS; the sys-post pusher
     // relays it to Post POST /v1/send afterwards.
-    set_rls_context(&mut *tx, sentin8::config::SYSTEM_ENV_ID).await;
+    set_rls_context(&mut tx, sentin8::config::SYSTEM_ENV_ID).await;
     emit_sentin8_sys_event_tx(
-        &mut *tx,
+        &mut tx,
         sentin8::config::SYSTEM_ENV_ID,
         "sentin8:sys:invitation:sent",
         serde_json::json!({ "org_id": org_id, "invitation_id": row.get::<Uuid, _>("id") }),
     )
     .await;
     emit_post_notification_tx(
-        &mut *tx,
+        &mut tx,
         org_id,
         None,
         Some(row.get::<String, _>("email").as_str()),
@@ -3354,7 +3354,7 @@ pub async fn accept_invitation(
     // audit row, and event all run on ONE connection under the caller's
     // context. sys_invitations_select is context-initialized only.
     let mut tx = state.pool.begin().await.map_err(err_db)?;
-    set_rls_context(&mut *tx, a.claims.env_uuid()).await;
+    set_rls_context(&mut tx, a.claims.env_uuid()).await;
 
     let row = sqlx::query(
         r#"SELECT email, role, status, expires_at FROM invitations WHERE id = $1 AND org_id = $2"#,
@@ -3390,9 +3390,9 @@ pub async fn accept_invitation(
     // sys_organizations_select admits `id = sentin8_current_org_id` — the
     // org-slug lookup is platform-level data resolution, so re-set the
     // context to the system env for this read (same tx, still same-connection).
-    set_rls_context(&mut *tx, sentin8::config::SYSTEM_ENV_ID).await;
+    set_rls_context(&mut tx, sentin8::config::SYSTEM_ENV_ID).await;
     // Restore the caller's context for the remaining tenant-scoped writes.
-    set_rls_context(&mut *tx, a.claims.env_uuid()).await;
+    set_rls_context(&mut tx, a.claims.env_uuid()).await;
     sqlx::query("UPDATE invitations SET status = 'accepted' WHERE id = $1")
         .bind(invitation_id)
         .execute(&mut *tx)
@@ -3409,7 +3409,7 @@ pub async fn accept_invitation(
     // missing group fails the write. The group name
     // embeds the org UUID — the handler already holds org_id, so no
     // slug round-trip is needed.
-    set_rls_context(&mut *tx, sentin8::config::SYSTEM_ENV_ID).await;
+    set_rls_context(&mut tx, sentin8::config::SYSTEM_ENV_ID).await;
     // : the membership write rides AUTH's provisioning API (the
     // owner of auth.group_members); sys holds no auth.* DML grants.
     let provisioner = crate::auth_provision::AuthProvisioner::connect()
@@ -3438,7 +3438,7 @@ pub async fn accept_invitation(
     }
 
     audit_tx(
-        &mut *tx,
+        &mut tx,
         &a,
         "accept",
         "invitation",
@@ -3452,16 +3452,16 @@ pub async fn accept_invitation(
     // post_outbox row carries the ORG's env under the caller's (already
     // set) context — same-context INSERT passes RLS; the sys-post pusher
     // relays it to Post POST /v1/send afterwards.
-    set_rls_context(&mut *tx, sentin8::config::SYSTEM_ENV_ID).await;
+    set_rls_context(&mut tx, sentin8::config::SYSTEM_ENV_ID).await;
     emit_sentin8_sys_event_tx(
-        &mut *tx,
+        &mut tx,
         sentin8::config::SYSTEM_ENV_ID,
         "sentin8:sys:invitation:accepted",
         serde_json::json!({ "org_id": org_id, "invitation_id": invitation_id }),
     )
     .await;
     emit_post_notification_tx(
-        &mut *tx,
+        &mut tx,
         org_id,
         Some(user_id),
         None,
@@ -3624,7 +3624,7 @@ pub async fn set_org_branding(
     .await?;
     authorize_org(&a, org_id, &state.pool).await?;
     let mut tx = state.pool.begin().await.map_err(err_db)?;
-    set_rls_context(&mut *tx, sentin8::config::SYSTEM_ENV_ID).await;
+    set_rls_context(&mut tx, sentin8::config::SYSTEM_ENV_ID).await;
     let row = sqlx::query(
         r#"INSERT INTO branding (org_id, env_id, scope, logo_url, logo_icon_url, primary_color, accent_color, font_family, theme_mode, custom_css, sign_in_text)
            VALUES ($1, NULL, 'org', $2, $3, $4, $5, $6, COALESCE($7, ''), $8, $9)
@@ -3639,11 +3639,11 @@ pub async fn set_org_branding(
     .bind(&req.logo_url).bind(&req.logo_icon_url).bind(&req.primary_color).bind(&req.accent_color)
     .bind(&req.font_family).bind(req.theme_mode.as_deref().unwrap_or("")).bind(&req.custom_css).bind(&req.sign_in_text)
     .fetch_one(&mut *tx).await.map_err(err_db)?;
-    audit_tx(&mut *tx, &a, "update", "branding", "org", None, None).await;
+    audit_tx(&mut tx, &a, "update", "branding", "org", None, None).await;
     // Stories — emit sys.branding.org.updated, same tx.
-    set_rls_context(&mut *tx, sentin8::config::SYSTEM_ENV_ID).await;
+    set_rls_context(&mut tx, sentin8::config::SYSTEM_ENV_ID).await;
     emit_sentin8_sys_event_tx(
-        &mut *tx,
+        &mut tx,
         sentin8::config::SYSTEM_ENV_ID,
         "sentin8:sys:branding:org:updated",
         serde_json::json!({ "org_id": org_id }),
@@ -3737,7 +3737,7 @@ pub async fn set_env_branding(
     let org_id = resolve_org_id(&state.pool, env_id).await?;
     authorize_org(&a, org_id, &state.pool).await?;
     let mut tx = state.pool.begin().await.map_err(err_db)?;
-    set_rls_context(&mut *tx, env_id).await;
+    set_rls_context(&mut tx, env_id).await;
     let row = sqlx::query(
         r#"INSERT INTO branding (org_id, env_id, scope, logo_url, logo_icon_url, primary_color, accent_color, font_family, theme_mode, custom_css, sign_in_text)
            VALUES ($1, $2, 'env', $3, $4, $5, $6, $7, COALESCE($8, ''), $9, $10)
@@ -3752,10 +3752,10 @@ pub async fn set_env_branding(
     .bind(&req.logo_url).bind(&req.logo_icon_url).bind(&req.primary_color).bind(&req.accent_color)
     .bind(&req.font_family).bind(req.theme_mode.as_deref().unwrap_or("")).bind(&req.custom_css).bind(&req.sign_in_text)
     .fetch_one(&mut *tx).await.map_err(err_db)?;
-    audit_tx(&mut *tx, &a, "update", "branding", "env", None, None).await;
+    audit_tx(&mut tx, &a, "update", "branding", "env", None, None).await;
     // Stories — emit sys.branding.env.updated, same tx.
     emit_sentin8_sys_event_tx(
-        &mut *tx,
+        &mut tx,
         env_id,
         "sentin8:sys:branding:env:updated",
         serde_json::json!({ "env_id": env_id }),
@@ -3824,10 +3824,8 @@ pub async fn get_merged_branding(
         primary_color: pick(get_str(env, "primary_color"), get_str(org, "primary_color")),
         accent_color: pick(get_str(env, "accent_color"), get_str(org, "accent_color")),
         font_family: pick(get_str(env, "font_family"), get_str(org, "font_family")),
-        theme_mode: get_theme(env)
-            .is_empty()
-            .then(|| get_theme(org))
-            .unwrap_or_else(|| get_theme(env)),
+        theme_mode: if get_theme(env)
+            .is_empty() { get_theme(org) } else { get_theme(env) },
         custom_css: pick(get_str(env, "custom_css"), get_str(org, "custom_css")),
         sign_in_text: pick(get_str(env, "sign_in_text"), get_str(org, "sign_in_text")),
     }))
@@ -3981,7 +3979,7 @@ pub async fn get_instance_scopes(
     // hostname. The context is transaction-local, so hold it inside an
     // explicit transaction (autocommit evaporates it before the query).
     let mut conn = state.pool.begin().await.map_err(err_db)?;
-    set_rls_context(&mut *conn, sentin8::config::SYSTEM_ENV_ID).await;
+    set_rls_context(&mut conn, sentin8::config::SYSTEM_ENV_ID).await;
     let row = sqlx::query(
         r#"SELECT i.allowed_scopes, i.allowed_services, i.oauth_client_id
              FROM app_instances i
@@ -4078,7 +4076,7 @@ pub async fn get_tenant_snapshot(
     // connection — an autocommit lookup before the tx would see zero rows
     // under FORCE RLS (sys.environments is tenant-gated).
     let mut tx = state.pool.begin().await.map_err(err_db)?;
-    set_rls_context(&mut *tx, sentin8::config::SYSTEM_ENV_ID).await;
+    set_rls_context(&mut tx, sentin8::config::SYSTEM_ENV_ID).await;
 
     // Scoped discovery (VDC-4): the caller's service identity comes from the
     // verified M2M token's `service_type` claim — stamped by Auth from the
@@ -4117,7 +4115,7 @@ pub async fn get_tenant_snapshot(
     // org check). The same-transaction SYSTEM-context lookup below.
     if a.claims.env_id.as_deref() == Some(&env_id.to_string()) {
         let mut tx = state.pool.begin().await.map_err(err_db)?;
-        set_rls_context(&mut *tx, sentin8::config::SYSTEM_ENV_ID).await;
+        set_rls_context(&mut tx, sentin8::config::SYSTEM_ENV_ID).await;
         let snap: Option<(
             Uuid,
             String,
@@ -4185,7 +4183,7 @@ pub async fn get_tenant_snapshot(
             LIMIT 1"#,
     )
     .bind(env_id)
-    .bind(&caller_leaf)
+    .bind(caller_leaf)
     .fetch_optional(&mut *tx)
     .await
     .map_err(err_db)?;
@@ -4288,7 +4286,7 @@ pub async fn resolve_hostname(
     // is transaction-local: begin an explicit transaction or it evaporates
     // before the queries run.
     let mut conn = state.pool.begin().await.map_err(err_db)?;
-    set_rls_context(&mut *conn, sentin8::config::SYSTEM_ENV_ID).await;
+    set_rls_context(&mut conn, sentin8::config::SYSTEM_ENV_ID).await;
 
     let labels: Vec<&str> = host.split('.').collect();
     if labels.len() < 3 {
@@ -4468,12 +4466,9 @@ pub async fn get_instance_auth_mode(
     // hostname. The context is transaction-local, so hold it inside an
     // explicit transaction (autocommit evaporates it before the query).
     let mut conn = state.pool.begin().await.map_err(err_db)?;
-    set_rls_context(&mut *conn, sentin8::config::SYSTEM_ENV_ID).await;
+    set_rls_context(&mut conn, sentin8::config::SYSTEM_ENV_ID).await;
     let instance_id = if !app_id.is_empty() {
-        match Uuid::parse_str(app_id) {
-            Ok(id) => Some(id),
-            Err(_) => None,
-        }
+        Uuid::parse_str(app_id).ok()
     } else {
         None
     };
@@ -4673,7 +4668,7 @@ pub async fn bootstrap(
     // transaction whose context covers the whole catalog view: the caller's
     // env (the platform view for platform admins, SYSTEM_ENV_ID otherwise).
     let mut tx = state.pool.begin().await.map_err(err_db)?;
-    set_rls_context(&mut *tx, a.claims.env_uuid()).await;
+    set_rls_context(&mut tx, a.claims.env_uuid()).await;
     let orgs = sqlx::query_as::<_, OrgRow>(
         r#"SELECT DISTINCT o.id, o.slug, o.display_name, o.status, o.domain, o.created_at
            FROM organizations o
@@ -4709,7 +4704,7 @@ pub async fn bootstrap(
     // Default org = the first membership's org (or System Org for platform admins).
     // Same context rule as the catalog read above.
     let mut tx = state.pool.begin().await.map_err(err_db)?;
-    set_rls_context(&mut *tx, a.claims.env_uuid()).await;
+    set_rls_context(&mut tx, a.claims.env_uuid()).await;
     let default_org = if a.is_platform_admin() {
         sqlx::query_as::<_, OrgRow>(
             "SELECT id, slug, display_name, status, domain, created_at FROM organizations WHERE id = $1",
@@ -5212,7 +5207,9 @@ async fn authorize_org(
     let owners = format!("sentin8:org:{org_id}:owners");
     let admins = format!("sentin8:org:{org_id}:admins");
     let viewers = format!("sentin8:org:{org_id}:viewers");
-    let member = groups.iter().any(|g| g == &owners || g == &admins || g == &viewers);
+    let member = groups
+        .iter()
+        .any(|g| g == &owners || g == &admins || g == &viewers);
     if member {
         Ok(())
     } else {
@@ -5781,7 +5778,7 @@ pub async fn provision_org_access(
         .execute(&mut *tx)
         .await;
     provision_org_access_tx(
-        &mut *tx,
+        &mut tx,
         org_id,
         creator_user_id,
         sentin8::config::SYSTEM_ENV_ID,
@@ -5832,18 +5829,15 @@ pub async fn provision_env_access(
         .bind(sentin8::config::SYSTEM_ENV_ID)
         .execute(&mut *tx)
         .await;
-    provision_env_access_tx(&mut *tx, org_id, env_id, creator_user_id).await?;
+    provision_env_access_tx(&mut tx, org_id, env_id, creator_user_id).await?;
     // Env-scoped realm provisioning: provision sentin8:env:admin/env:viewer
     // roles + groups in the env's own realm (the seed inside is now a
     // no-op ON CONFLICT — the sets landed above).
-    provision_env_realm_tx(&mut *tx, org_id, env_id, creator_user_id).await?;
+    provision_env_realm_tx(&mut tx, org_id, env_id, creator_user_id).await?;
     tx.commit().await?;
     // Read-your-writes (sys DESIGN §2, backlog RYW-1): env creation
     // grants in BOTH the SYSTEM realm (org-scoped env access) and the
     // new env's own realm — sweep THIS process's resolver for both.
-    crate::policy::invalidate_local_identity_caches([
-        sentin8::config::SYSTEM_ENV_ID,
-        env_id,
-    ]);
+    crate::policy::invalidate_local_identity_caches([sentin8::config::SYSTEM_ENV_ID, env_id]);
     Ok(())
 }

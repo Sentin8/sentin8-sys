@@ -29,8 +29,7 @@ pub const DOMAIN_EVENT: &str = "sentin8:sys:domain:changed";
 
 /// Process-wide MemBus handle — connected once at boot (fail-soft: a
 /// Valkey outage degrades refresh to the safety poll).
-static MEMBUS_HANDLE: tokio::sync::OnceCell<Option<MemBus>> =
-    tokio::sync::OnceCell::const_new();
+static MEMBUS_HANDLE: tokio::sync::OnceCell<Option<MemBus>> = tokio::sync::OnceCell::const_new();
 
 /// Connect once (awaited from `build_state`); subsequent calls reuse the
 /// handle (borrowed — MemBus is not Clone, so the publish path borrows
@@ -74,13 +73,12 @@ pub async fn publish_domain_changed(
     let Some(bus) = handle().await else {
         return; // notifications disabled — safety poll covers
     };
- // System-domain notifications ride the SYSTEM env's ephemeral channel
- // (the sys org/env is the platform's own tenant, membus design ).
- // `for_env` is UUID-bound (membus validates the env id); the platform
- // env's UUID is the SYSTEM_ENV_ID constant — the slug alone fails the
- // binding gate and would have silently disabled every notification.
-    let Ok(env_bus) = bus.for_env(&sentin8::config::SYSTEM_ENV_ID.to_string())
-    else {
+    // System-domain notifications ride the SYSTEM env's ephemeral channel
+    // (the sys org/env is the platform's own tenant, membus design ).
+    // `for_env` is UUID-bound (membus validates the env id); the platform
+    // env's UUID is the SYSTEM_ENV_ID constant — the slug alone fails the
+    // binding gate and would have silently disabled every notification.
+    let Ok(env_bus) = bus.for_env(&sentin8::config::SYSTEM_ENV_ID.to_string()) else {
         return;
     };
     let payload = serde_json::json!({

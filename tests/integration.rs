@@ -186,9 +186,8 @@ async fn spawn_app() -> Option<(Router, TestIssuer)> {
     // RLS assertions would see superuser-bypassed rows. `SENTIN8_SYS_DB_DSN`
     // wins; DATABASE_URL (superuser, e.g. for sqlx macro fixtures) is only
     // used for the SEEDING pool (spawn_pool), never for the app.
-    let database_url = std::env::var("SENTIN8_SYS_DB_DSN").unwrap_or_else(|_| {
-        "postgres://sentin8_sys_service@localhost:5432/sentin8".to_string()
-    });
+    let database_url = std::env::var("SENTIN8_SYS_DB_DSN")
+        .unwrap_or_else(|_| "postgres://sentin8_sys_service@localhost:5432/sentin8".to_string());
     let pool = match sqlx::PgPool::connect(&database_url).await {
         Ok(p) => p,
         Err(e) => {
@@ -199,7 +198,7 @@ async fn spawn_app() -> Option<(Router, TestIssuer)> {
 
     let config = sentin8_sys_server::config::SysConfig {
         port: 0,
-        auth_client: auth_client,
+        auth_client,
     };
     // Live-identity resolution points at the test issuer (its userinfo
     // endpoint echoes the token's scope claim — mirrors production Auth).
@@ -212,7 +211,9 @@ async fn spawn_app() -> Option<(Router, TestIssuer)> {
         // empty-env deny would otherwise reject every request). These tests
         // exercise sys domain flows, not the policy surface.
         policy: seeded_sys_engine(),
-        workload_registry: sentin8::auth::workload_registry::WorkloadMap::boot_load_empty("sentin8:sys"),
+        workload_registry: sentin8::auth::workload_registry::WorkloadMap::boot_load_empty(
+            "sentin8:sys",
+        ),
         admin: sentin8::shield::admin::SharedAdminState::test("sentin8:sys", pool),
     };
     let app = routes(axum::Router::new()).with_state(state);
