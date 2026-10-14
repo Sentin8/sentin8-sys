@@ -363,7 +363,6 @@ pub async fn readiness(
 /// - `service_flag` — the service that must be enabled (e.g. "ledger")
 /// - `enabled` — whether the feature is enabled for this org/env
 /// - `pages` — array of admin_ui page definitions (route, label, ui_endpoint, data_endpoint)
-///
 /// See `sentin8-.md` for the Remote UI architecture.
 /// `GET /v1/verticals/services` — discover registered vertical services.
 #[utoipa::path(
