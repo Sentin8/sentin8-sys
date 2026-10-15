@@ -3823,8 +3823,11 @@ pub async fn get_merged_branding(
         primary_color: pick(get_str(env, "primary_color"), get_str(org, "primary_color")),
         accent_color: pick(get_str(env, "accent_color"), get_str(org, "accent_color")),
         font_family: pick(get_str(env, "font_family"), get_str(org, "font_family")),
-        theme_mode: if get_theme(env)
-            .is_empty() { get_theme(org) } else { get_theme(env) },
+        theme_mode: if get_theme(env).is_empty() {
+            get_theme(org)
+        } else {
+            get_theme(env)
+        },
         custom_css: pick(get_str(env, "custom_css"), get_str(org, "custom_css")),
         sign_in_text: pick(get_str(env, "sign_in_text"), get_str(org, "sign_in_text")),
     }))
