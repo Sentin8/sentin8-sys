@@ -4,7 +4,11 @@
     {
       "service_type": "sentin8:sys",
       "subdomain": "sys",
-      "binary": "sentin8-sys"
+      "binary": "sentin8-sys",
+      "telemetry_property": {
+        "slug": "sys",
+        "name": "Sentin8:Sys Platform Telemetry"
+      }
     }
   ]
 }
