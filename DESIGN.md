@@ -1,4 +1,4 @@
-# DESIGN.md: Sentin8:Sys — Detailed Design Document
+# Sentin8:Sys — Detailed Design Document
 
 ## 1. Scope & Context
 
