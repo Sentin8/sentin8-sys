@@ -16,6 +16,21 @@ use crate::handlers;
 #[derive(OpenApi)]
 #[openapi(
     paths(
+        sentin8::shell::policy_check_relation,
+        sentin8::shell::policy_delete_attribute,
+        sentin8::shell::policy_delete_relation,
+        sentin8::shell::policy_delete_set,
+        sentin8::shell::policy_get_set,
+        sentin8::shell::policy_list_attributes,
+        sentin8::shell::policy_list_relations,
+        sentin8::shell::policy_list_sets,
+        sentin8::shell::policy_mode_disable,
+        sentin8::shell::policy_mode_enforce,
+        sentin8::shell::policy_mode_shadow,
+        sentin8::shell::policy_put_attribute,
+        sentin8::shell::policy_put_relation,
+        sentin8::shell::policy_put_set,
+        sentin8::shell::policy_test_set,
         handlers::health,
         handlers::readiness,
         handlers::list_vertical_services,
@@ -46,6 +61,9 @@ use crate::handlers;
         handlers::remove_membership,
         handlers::send_invitation,
         handlers::accept_invitation,
+        handlers::list_invitations,
+        handlers::revoke_invitation,
+        handlers::resolve_hostname,
         handlers::get_org_branding,
         handlers::set_org_branding,
         handlers::get_env_branding,
@@ -91,7 +109,7 @@ use crate::handlers;
     )),
     security(),
     tags(
+        (name = "policy", description = "Shield policy administration (shared surface)"),
         (name = "sys", description = "Sentin8:Sys admin API — org/env lifecycle, services, applications, branding, audit"),
     ),
-)]
-pub struct SysOpenApi;
+)]pub struct SysOpenApi;

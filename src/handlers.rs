@@ -2558,7 +2558,7 @@ pub async fn update_application(
 #[utoipa::path(
     post,
     operation_id = "app.archive",
-    path = "/v1/env/{env_id}/applications/{app_id}/archive",
+    path = "/v1/env/{env_id}/applications/{app_id}",
     params(("env_id" = Uuid, Path, description = "Environment ID"), ("app_id" = Uuid, Path, description = "Application ID")),
     responses(
         (status = 204, description = "Application archived"),
