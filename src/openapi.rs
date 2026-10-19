@@ -110,6 +110,6 @@ use crate::handlers;
     security(),
     tags(
         (name = "policy", description = "Shield policy administration (shared surface)"),
-        (name = "sys", description = "Sentin8:Sys admin API — org/env lifecycle, services, applications, branding, audit"),
+        (name = "sys", description = "Sentin8:Sys admin API - org/env lifecycle, services, applications, branding, audit"),
     ),
 )]pub struct SysOpenApi;

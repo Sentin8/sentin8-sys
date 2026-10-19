@@ -5,7 +5,7 @@
 
 //! Axum server setup for Sys.
 //!
-//! Stories — scaffold Rust service with HTTP router, config loading,
+//! Stories - scaffold Rust service with HTTP router, config loading,
 //! health check. Wires the PostgreSQL pool and all Sys routes.
 
 use std::sync::Arc;
@@ -16,7 +16,7 @@ use crate::config::SysConfig;
 use crate::handlers::{self, AppState};
 
 /// Build the service state (config, pool, workers). Runs inside the
-/// shell's `with_state` closure — the pool arrives already created and
+/// shell's `with_state` closure - the pool arrives already created and
 /// PG18-checked; this constructs the service config, spawns background
 /// workers, and returns the state.
 pub async fn build_state(
@@ -25,12 +25,12 @@ pub async fn build_state(
     let config = SysConfig::from_env();
 
     // : warm the MemBus connection so domain-changed
-    // notifications publish from the first mutation on. Fail-soft — a
+    // notifications publish from the first mutation on. Fail-soft - a
     // Valkey outage degrades resolver refresh to the 30s safety poll.
     crate::domain_events::init().await;
 
-    // ── Sentin8:Policy (— shell-owned boot): consume the
-    // engine the shell booted in step 8 — no second engine, consumer, or
+    // ── Sentin8:Policy (- shell-owned boot): consume the
+    // engine the shell booted in step 8 - no second engine, consumer, or
     // DCR registration here.
     let policy_engine = core.admin.policy.clone();
 
@@ -47,7 +47,7 @@ pub async fn build_state(
     {
         Ok(map) => map,
         Err(e) => {
-            tracing::warn!(error = %e, "sys: workload registry map unavailable at boot — certificate-workload calls fail-closed until next boot");
+            tracing::warn!(error = %e, "sys: workload registry map unavailable at boot - certificate-workload calls fail-closed until next boot");
             sentin8::auth::workload_registry::WorkloadMap::boot_load_empty("sentin8:sys")
         }
     };
@@ -66,7 +66,7 @@ pub async fn build_state(
     };
 
     // DBX (SYS-3, sys DESIGN §10): the sys-post pusher drains the local
-    // `post_outbox` (invitation sent/accepted mails) to Post's send API —
+    // `post_outbox` (invitation sent/accepted mails) to Post's send API -
     // no direct post.inbox writes. The `sys-post` M2M identity + token
     // source are resolved lazily on the first pass (a boot-time DCR
     // failure only delays the drain; rows stay queued).
@@ -85,7 +85,7 @@ pub async fn build_state(
 /// Add this service's routes onto the shell-provided router. The shell
 /// owns the boot sequence, state binding, OpenAPI merge and middleware
 /// stack; this function adds ONLY routes (including the service's own
-/// `/v1/health` — custom payload).
+/// `/v1/health` - custom payload).
 pub fn routes(
     router: axum::Router<crate::handlers::AppState>,
 ) -> axum::Router<crate::handlers::AppState> {
@@ -93,7 +93,7 @@ pub fn routes(
         // ── Operational (Stories) ───────────────────────────
         .route("/v1/health", get(handlers::health))
         .route("/v1/readiness", get(handlers::readiness))
-        // ── Vertical Services (RFW discovery — Stories) ─────────────────
+        // ── Vertical Services (RFW discovery - Stories) ─────────────────
         .route(
             "/v1/verticals/services",
             get(handlers::list_vertical_services),
@@ -144,7 +144,7 @@ pub fn routes(
             "/v1/org/{org_id}/memberships",
             get(handlers::list_memberships).delete(handlers::remove_membership),
         )
-        // — full invitation lifecycle owned by sys; auth's admin
+        // - full invitation lifecycle owned by sys; auth's admin
         // UI proxies here.
         .route(
             "/v1/org/{org_id}/invitations",
@@ -178,7 +178,7 @@ pub fn routes(
             get(handlers::get_env_auth_domain),
         )
         // VDC-4 (design/sentin8-vertical-data-plane-contract.md §VDC.5): the
-        // sanctioned M2M on-demand tenant read for vertical services —
+        // sanctioned M2M on-demand tenant read for vertical services -
         // scoped discovery answers only for envs where the caller's own
         // service is enabled.
         .route("/v1/tenants/{env_id}", get(handlers::get_tenant_snapshot))
@@ -188,10 +188,10 @@ pub fn routes(
             "/v1/app-instance/scopes",
             get(handlers::get_instance_scopes),
         )
-        // — the single cache-miss path for every service's
+        // - the single cache-miss path for every service's
         // embedded sentin8-tls DomainResolver (no sys.* table grants).
         .route("/v1/resolve/hostname", get(handlers::resolve_hostname))
-        // Stories — app instance auth mode + staff Auth domain resolution.
+        // Stories - app instance auth mode + staff Auth domain resolution.
         .route(
             "/v1/app-instance/auth-mode",
             get(handlers::get_instance_auth_mode),
@@ -203,7 +203,7 @@ pub fn routes(
         // ── Platform scope catalog (Stories) ─────────────────────────
         // Public list of well-known OAuth scopes. Used by Dash's
         // ScopeSelector widget to populate the autocomplete without
-        // duplicating the list on the client. Open endpoint — same
+        // duplicating the list on the client. Open endpoint - same
         // list for every caller.
         .route("/v1/scopes/catalog", get(handlers::get_scope_catalog))
         // ── Bootstrap ────────────────────────────────────
@@ -213,8 +213,8 @@ pub fn routes(
             "/v1/audit",
             get(handlers::list_audit).post(handlers::ingest_audit),
         )
-        // Traffic counter — counts every inbound request (excludes health checks).
-        // ── Sentin8:Policy admin API ( — shared implementation,
+        // Traffic counter - counts every inbound request (excludes health checks).
+        // ── Sentin8:Policy admin API ( - shared implementation,
         // one surface per service; handlers are generic over this AppState).
         .route(
             "/v1/admin/policy-sets",
@@ -260,7 +260,7 @@ pub fn routes(
         )
 }
 
-/// Shared policy-admin surface accessor — the shared
+/// Shared policy-admin surface accessor - the shared
 /// handlers extract this service's admin state via [`HasPolicyAdmin`].
 impl sentin8::shield::admin::HasPolicyAdmin for AppState {
     fn policy_admin(&self) -> &sentin8::shield::admin::SharedAdminState {

@@ -38,12 +38,12 @@ fn openapi_spec() -> serde_json::Value {
 
 /// Default declarative policy sets (Sentin8:Policy design /):
 /// action-granular scope permits over the LIVE effective scope set. Seeded
-/// `origin='platform'`, `mode='enforced'` ( — step 5 is
+/// `origin='platform'`, `mode='enforced'` ( - step 5 is
 /// the only gate; shadow is the emergency one-UPDATE rollback lever only).
 const POLICIES: &[PolicySetDecl] = &[
     PolicySetDecl {
         policy_set_name: "scope-mirror",
-        description: "Action-granular scope permits for sentin8:sys over the LIVE effective scope set. Enforced — step 5 is the only gate.",
+        description: "Action-granular scope permits for sentin8:sys over the LIVE effective scope set. Enforced - step 5 is the only gate.",
         policies: "permit(principal, action == Action::\"sentin8:sys:org:admin\", resource) when { principal.scopes.contains(\"sentin8:sys:org:admin\") };\npermit(principal, action == Action::\"sentin8:sys:org:admin\", resource) when { principal.scopes.contains(\"sentin8:dash:org:create\") };\npermit(principal, action == Action::\"sentin8:sys:org:admin\", resource) when { principal.scopes.contains(\"sentin8:dash:org:update\") };\npermit(principal, action == Action::\"sentin8:sys:org:admin\", resource) when { principal.scopes.contains(\"sentin8:dash:org:delete\") };\npermit(principal, action == Action::\"sentin8:sys:org:admin\", resource) when { principal.scopes.contains(\"sentin8:dash:org:archive\") };\npermit(principal, action == Action::\"sentin8:sys:env:admin\", resource) when { principal.scopes.contains(\"sentin8:sys:env:admin\") };\npermit(principal, action == Action::\"sentin8:sys:env:admin\", resource) when { principal.scopes.contains(\"sentin8:dash:env:create\") };\npermit(principal, action == Action::\"sentin8:sys:env:admin\", resource) when { principal.scopes.contains(\"sentin8:dash:env:update\") };\npermit(principal, action == Action::\"sentin8:sys:env:admin\", resource) when { principal.scopes.contains(\"sentin8:dash:env:delete\") };\npermit(principal, action == Action::\"sentin8:sys:env:admin\", resource) when { principal.scopes.contains(\"sentin8:dash:env:archive\") };\npermit(principal, action == Action::\"sentin8:sys:app:admin\", resource) when { principal.scopes.contains(\"sentin8:sys:app:admin\") };\npermit(principal, action == Action::\"sentin8:sys:audit:read\", resource) when { principal.scopes.contains(\"sentin8:sys:audit:read\") };\npermit(principal, action == Action::\"sentin8:sys:instances:read\", resource) when { principal.scopes.contains(\"sentin8:sys:instances:read\") };\npermit(principal, action == Action::\"sentin8:sys:instances:read\", resource) when { principal.scopes.contains(\"sentin8:sys:admin\") };\npermit(principal, action == Action::\"sentin8:sys:instances:read\", resource) when { principal.scopes.contains(\"sentin8:sys:env:admin\") };\npermit(principal, action == Action::\"sentin8:sys:instances:read\", resource) when { principal.scopes.contains(\"sentin8:sys:org:admin\") };\npermit(principal, action == Action::\"sentin8:sys:memberships:admin\", resource) when { principal.scopes.contains(\"sentin8:sys:memberships:admin\") };\npermit(principal, action == Action::\"sentin8:sys:services:admin\", resource) when { principal.scopes.contains(\"sentin8:sys:services:admin\") };\npermit(principal, action == Action::\"sentin8:sys:services:admin\", resource) when { principal.scopes.contains(\"sentin8:sys:admin\") };\npermit(principal, action == Action::\"sentin8:sys:services:admin\", resource) when { principal.scopes.contains(\"sentin8:sys:env:admin\") };\npermit(principal, action == Action::\"sentin8:sys:services:admin\", resource) when { principal.scopes.contains(\"sentin8:sys:org:admin\") };\npermit(principal, action == Action::\"sentin8:sys:read\", resource) when { principal.scopes.contains(\"sentin8:sys:admin\") };\npermit(principal, action == Action::\"sentin8:sys:read\", resource) when { principal.scopes.contains(\"sentin8:sys:org:admin\") };\npermit(principal, action == Action::\"sentin8:sys:read\", resource) when { principal.scopes.contains(\"sentin8:sys:env:admin\") };\npermit(principal, action == Action::\"sentin8:sys:read\", resource) when { principal.scopes.contains(\"sentin8:sys:org:view\") };\npermit(principal, action == Action::\"sentin8:sys:read\", resource) when { principal.scopes.contains(\"sentin8:sys:env:view\") };\npermit(principal, action == Action::\"sentin8:sys:read\", resource) when { principal.scopes.contains(\"sentin8:sys:view\") };\npermit(principal, action == Action::\"sentin8:sys:tenants:read\", resource) when { principal.scopes.contains(\"sentin8:sys:tenants:read\") };",
         schema: None,
         mode: "enforced",
@@ -51,7 +51,7 @@ const POLICIES: &[PolicySetDecl] = &[
     },
 ];
 
-/// Default ReBAC relation tuples — none declared by this
+/// Default ReBAC relation tuples - none declared by this
 /// service today; env admins author their own graph via the admin API.
 const RELATIONS: &[RelationDecl] = &[];
 
@@ -61,7 +61,7 @@ const RELATIONS: &[RelationDecl] = &[];
 /// With `--section=<name>`, outputs only that section as a standalone JSON value.
 /// M2M DCR workload grants (self-registration ): this
 /// service's own `certless:<workload>` rows, upserted by `vertical enroll`.
-/// The static auth seed is retired — this declaration is the ONLY
+/// The static auth seed is retired - this declaration is the ONLY
 /// provisioning path ( "DCR is dynamic").
 /// Cover BOTH the full-identity `-policy` spelling (policy_bus_client) and
 /// the bare `{short}-policy` spelling (stat_emit); the gate's superset
@@ -95,12 +95,12 @@ const M2M_GRANTS: &[sentin8::registration::M2mGrant] = &[
         scopes: &["sentin8:bus:consume", "sentin8:stat:measure"],
     },
     // SYS-3: the post pusher drains sys's local `post_outbox` to Post's
-    // send API with this M2M client (DBX — no direct post.inbox writes).
+    // send API with this M2M client (DBX - no direct post.inbox writes).
     sentin8::registration::M2mGrant {
         workload: "sys-post",
         scopes: &["sentin8:post:write"],
     },
-    // TLS-RLS-4 (design/sentin8-vertical-data-plane-contract.md §VDC.7): the database-free HostContextResolver’s resolve workload — cache miss calls Sys `GET /v1/resolve/hostname`.
+    // TLS-RLS-4 (design/sentin8-vertical-data-plane-contract.md §VDC.7): the database-free HostContextResolver’s resolve workload - cache miss calls Sys `GET /v1/resolve/hostname`.
     sentin8::registration::M2mGrant {
         workload: "sentin8-sys-tls",
         scopes: &["sentin8:sys:instances:read"],

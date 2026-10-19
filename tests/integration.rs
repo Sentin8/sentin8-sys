@@ -3,7 +3,7 @@
 // SPDX-FileCopyrightText: Copyright Contributors to the Sentin8:Sys
 // SPDX-License-Identifier: Apache-2.0
 
-//! Sentin8:Sys tests — TEST-SYS-1/2/3 (per `sentin8-testing-strategy.md`).
+//! Sentin8:Sys tests - TEST-SYS-1/2/3 (per `sentin8-testing-strategy.md`).
 
 use std::sync::Arc;
 
@@ -67,7 +67,7 @@ impl TestIssuer {
             }]
         });
 
-        // /oauth/userinfo — the live-identity endpoint the policy engine's
+        // /oauth/userinfo - the live-identity endpoint the policy engine's
         // RoleResolver calls (mirrors production Sentin8:Auth). Echoes the
         // token's own `scope` claim as the effective scope set.
         let app = axum::Router::new()
@@ -179,7 +179,7 @@ async fn spawn_app() -> Option<(Router, TestIssuer)> {
         ..Default::default()
     });
 
-    // The service's own NOBYPASSRLS role — REQUIRED for schema resolution
+    // The service's own NOBYPASSRLS role - REQUIRED for schema resolution
     // under DBX: the sys role's search_path (`sys, auth, public`) resolves
     // unqualified `outbox` to sys.outbox. The superuser DSN searches auth
     // FIRST, so handler outbox writes would land in auth.outbox and the
@@ -191,7 +191,7 @@ async fn spawn_app() -> Option<(Router, TestIssuer)> {
     let pool = match sqlx::PgPool::connect(&database_url).await {
         Ok(p) => p,
         Err(e) => {
-            eprintln!("skipping DB-backed sys handler tests — PostgreSQL unreachable: {e}");
+            eprintln!("skipping DB-backed sys handler tests - PostgreSQL unreachable: {e}");
             return None;
         }
     };
@@ -201,12 +201,12 @@ async fn spawn_app() -> Option<(Router, TestIssuer)> {
         auth_client,
     };
     // Live-identity resolution points at the test issuer (its userinfo
-    // endpoint echoes the token's scope claim — mirrors production Auth).
+    // endpoint echoes the token's scope claim - mirrors production Auth).
     sentin8::shield::runtime::init_shared_deps(&issuer.base_url, pool.clone());
     let state = AppState {
         config: Arc::new(config),
         pool: pool.clone(),
-        // Enforced scope-mirror seeded for the SYSTEM env — mirrors
+        // Enforced scope-mirror seeded for the SYSTEM env - mirrors
         // production (enroll seeds the enforced set; the fail-closed
         // empty-env deny would otherwise reject every request). These tests
         // exercise sys domain flows, not the policy surface.
@@ -227,7 +227,7 @@ async fn body_string(resp: axum::response::Response) -> String {
     String::from_utf8_lossy(&bytes).to_string()
 }
 
-// ── TEST-SYS-2: oneshot handler tests — scope negation ──────────────────
+// ── TEST-SYS-2: oneshot handler tests - scope negation ──────────────────
 
 #[tokio::test]
 async fn no_scope_rejected_on_all_protected_routes() {
@@ -240,7 +240,7 @@ async fn no_scope_rejected_on_all_protected_routes() {
         "ledger:products:read",
         300,
     );
-    // Bodies must be schema-valid for the route — otherwise axum's
+    // Bodies must be schema-valid for the route - otherwise axum's
     // deserializer rejects with 422 BEFORE the scope check runs.
     let bodies: &[(&str, &str, &str)] = &[
         ("POST", "/v1/o", r#"{"slug":"scopetest-org","display_name":"Scope Test"}"#),
@@ -367,7 +367,7 @@ async fn tenant_resolution_endpoints_reject_wrong_scope() {
     }
 }
 
-/// SEC-SYS-7 — the granular `sentin8:sys:instances:read` scope (the BFF delegator's
+/// SEC-SYS-7 - the granular `sentin8:sys:instances:read` scope (the BFF delegator's
 /// DCR scope) must satisfy the BFF-only tenant-resolution endpoints. Without
 /// this, the BFF's instance lookup at `/auth/callback` 403s, sessions are
 /// created unbound, and the D2 fail-closed check rejects every request
@@ -405,7 +405,7 @@ async fn tenant_resolution_endpoints_accept_instances_read_scope() {
     }
 }
 
-// ── TEST-SYS-1: unit tests — branding merge logic ────────────────────────
+// ── TEST-SYS-1: unit tests - branding merge logic ────────────────────────
 
 mod unit {
     #[test]
@@ -431,7 +431,7 @@ async fn invitation_acceptance_scopes_to_per_org_group() {
         .map(|v| v.trim().is_empty())
         .unwrap_or(true)
     {
-        eprintln!("skipping — SENTIN8_TLS_CA_PEM not set (M2M DCR untestable)");
+        eprintln!("skipping - SENTIN8_TLS_CA_PEM not set (M2M DCR untestable)");
         return;
     }
     let Some((app, issuer)) = spawn_app().await else {
@@ -444,7 +444,7 @@ async fn invitation_acceptance_scopes_to_per_org_group() {
 
     let pool = spawn_pool().await;
 
-    // The invited user must exist in users — accepting an invitation
+    // The invited user must exist in users - accepting an invitation
     // adds the user to a per-org group, and group_members carries an
     // FK to users(id). In the real flow the user signs up first.
     sqlx::query(
@@ -471,8 +471,8 @@ async fn invitation_acceptance_scopes_to_per_org_group() {
     .expect("seed org");
 
     // Mirror production: the create-org Flow saga provisions the per-org
-    // groups (sentin8:org:{org_id}:owners/admins/viewers — §6.0c id-based
-    // names) — accept_invitation adds the user to
+    // groups (sentin8:org:{org_id}:owners/admins/viewers - §6.0c id-based
+    // names) - accept_invitation adds the user to
     // `sentin8:org:{org_id}:admins`, so the access model must exist first.
     sentin8_sys_server::handlers::provision_org_access_tx(
         &mut pool.acquire().await.expect("prov conn"),
@@ -555,7 +555,7 @@ async fn invitation_acceptance_scopes_to_per_org_group() {
         .await;
 }
 
-/// FIX-SYS-1 — acceptance against an org whose access model was never
+/// FIX-SYS-1 - acceptance against an org whose access model was never
 /// provisioned must fail with 409 (not silently 204 without a membership).
 #[tokio::test]
 async fn invitation_acceptance_unprovisioned_org_conflicts() {
@@ -565,7 +565,7 @@ async fn invitation_acceptance_unprovisioned_org_conflicts() {
         .map(|v| v.trim().is_empty())
         .unwrap_or(true)
     {
-        eprintln!("skipping — SENTIN8_TLS_CA_PEM not set (M2M DCR untestable)");
+        eprintln!("skipping - SENTIN8_TLS_CA_PEM not set (M2M DCR untestable)");
         return;
     }
     let Some((app, issuer)) = spawn_app().await else {
@@ -858,14 +858,14 @@ async fn set_service_writes_event_in_same_transaction() {
 
 #[tokio::test]
 async fn org_access_provisioning_creates_groups_and_nesting() {
-    // The provisioning path DCRs via Sentin8:Auth's mTLS M2M channel —
+    // The provisioning path DCRs via Sentin8:Auth's mTLS M2M channel -
     // runtime-skip when the platform CA is not configured (plain `make test`
     // without the fleet env; CI with the CA runs them).
     if std::env::var("SENTIN8_TLS_CA_PEM")
         .map(|v| v.trim().is_empty())
         .unwrap_or(true)
     {
-        eprintln!("skipping — SENTIN8_TLS_CA_PEM not set (M2M DCR untestable)");
+        eprintln!("skipping - SENTIN8_TLS_CA_PEM not set (M2M DCR untestable)");
         return;
     }
     let Some((_app, _issuer)) = spawn_app().await else {
@@ -876,7 +876,7 @@ async fn org_access_provisioning_creates_groups_and_nesting() {
 
     let org_id = Uuid::new_v4();
     let creator = Uuid::new_v4();
-    // Seed the creator user first — group_members has an FK to
+    // Seed the creator user first - group_members has an FK to
     // users(id), and provisioning adds the creator to the owners group.
     sqlx::query(
         r#"INSERT INTO users (id, env_id, email, status)
@@ -927,22 +927,22 @@ async fn org_access_provisioning_creates_groups_and_nesting() {
     cleanup_org_access(&pool, org_id, Some(creator)).await;
 }
 
-/// Fixture pool: the platform superuser DSN (DDL/fixture role — service
+/// Fixture pool: the platform superuser DSN (DDL/fixture role - service
 /// roles are NOBYPASSRLS and would reject seeding without tenant context).
-/// FIX-SYS-3 — reverse-order cleanup of the artifacts
+/// FIX-SYS-3 - reverse-order cleanup of the artifacts
 /// `provision_org_access_tx` creates for one org (design §12 rule 8):
 /// memberships → group-role assignments → groups → role nesting → roles →
 /// seeded user. Roles/nesting are SHARED per-env rows (sentin8:org:owner/admin/viewer
-/// upserted with ON CONFLICT by every provisioning call) — they are removed
+/// upserted with ON CONFLICT by every provisioning call) - they are removed
 /// only when no other provisioning test can be running, i.e. from the caller's
 /// own teardown; the ON CONFLICT upsert makes re-creation deterministic for
-/// concurrent workers. Group names embed the org UUID (§6.0c) — cleanup is
+/// concurrent workers. Group names embed the org UUID (§6.0c) - cleanup is
 /// keyed by the org's own id prefix (no slug patterns).
 async fn cleanup_org_access(pool: &sqlx::PgPool, org_id: uuid::Uuid, user_id: Option<uuid::Uuid>) {
     // Shared roles may be referenced by another worker's groups mid-cleanup;
     // delete only this org's group bindings first, then leave the shared
     // roles themselves in place (they are idempotent upserts, recreated on
-    // demand — deleting them here would race a parallel provisioning test).
+    // demand - deleting them here would race a parallel provisioning test).
     let _ = sqlx::query(
         "DELETE FROM group_members WHERE group_id IN (SELECT id FROM groups WHERE name LIKE $1)",
     )
@@ -980,7 +980,7 @@ async fn spawn_pool() -> sqlx::PgPool {
 fn seeded_sys_engine() -> std::sync::Arc<sentin8_sys_server::policy::Engine> {
     let engine = sentin8_sys_server::policy::Engine::new("sentin8:sys");
     // The tests evaluate under the SYSTEM env (platform-admin surfaces) AND
-    // under ENV_A (tenant surfaces) — seed both (per-env sets, same permits).
+    // under ENV_A (tenant surfaces) - seed both (per-env sets, same permits).
     let envs = [
         sentin8::config::SYSTEM_ENV_ID,
         uuid::Uuid::parse_str(ENV_A).expect("static ENV_A"),

@@ -3,7 +3,7 @@
 // SPDX-FileCopyrightText: Copyright Contributors to the Sentin8:Sys
 // SPDX-License-Identifier: Apache-2.0
 
-//! Sentin8 Sys — cross-service orchestration (org/env/app lifecycle).
+//! Sentin8 Sys - cross-service orchestration (org/env/app lifecycle).
 //!
 //! See.
 //!

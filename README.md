@@ -1,4 +1,4 @@
-# Design Doc: Sentin8:Sys — Platform Control Plane
+# Design Doc: Sentin8:Sys - Platform Control Plane
 
 ## 1. Summary
 
@@ -9,7 +9,7 @@ resolver, the platform bootstrap surface, and the shared audit trail.
 Org/env creation is a **synchronous, in-process lifecycle**: the handler
 writes the record, provisions the access model (roles, groups, creator
 membership) through auth's membership provisioning API, and returns 200
-only when the org/env is fully usable — no workflow engine on the
+only when the org/env is fully usable - no workflow engine on the
 fundamental path, no background steps, no caller-side settle windows.
 Every domain change emits a durable local-outbox event (Sentin8:Bus produce
 path) plus a best-effort MemBus invalidation notification post-commit.
@@ -27,11 +27,11 @@ path) plus a best-effort MemBus invalidation notification post-commit.
 - **Authorization is data, not code.** Shield policy sets, ReBAC relation
   tuples, and principal attributes are sys-owned rows per environment; the
   per-service engines load and evaluate them (see
-  `crates/policy` — the Shield engine). Sys is the durable substrate and the
+  `crates/policy` - the Shield engine). Sys is the durable substrate and the
   admin surface, not the evaluator.
 - **Synchronous fundamental lifecycle.** Org/env creation spans two
   services (sys record + auth access model), but the span is two
-  idempotent HTTP calls wide — the create handler performs both before
+  idempotent HTTP calls wide - the create handler performs both before
   responding, with an in-handler compensating delete when provisioning
   fails. A workflow engine on this path added a proxy-back hop, a DLQ,
   and a read-your-writes window (the caller got 200 before its own
@@ -98,13 +98,13 @@ validation via auth's owner API), not by widening RLS.
   notification via post's inbox.
 - **Branding**: org base + env override + merged view
   (`/v1/env/{env_id}/branding/merged`).
-- **Resolver**: `GET /v1/resolve/hostname` — hostname → org/env/app
+- **Resolver**: `GET /v1/resolve/hostname` - hostname → org/env/app
   instance (BFF, Auth, TLS all consume this).
-- **Bootstrap**: `GET /v1/bootstrap` — the dash's first-screen data
+- **Bootstrap**: `GET /v1/bootstrap` - the dash's first-screen data
   (orgs the caller can reach, computed via auth's live group listing).
 - **Audit**: `POST /v1/audit` (service ingest → canonical rows + local
   journal) and `GET /v1/audit` (admin query: `limit`/`offset` plus
-  keyset pagination — `after_ts`/`after_id` return rows strictly older
+  keyset pagination - `after_ts`/`after_id` return rows strictly older
   than the cursor on the `(timestamp DESC, id DESC)` ordering, with
   `service`/`action`/`env_id` filters).
 - **Verticals**: `GET /v1/verticals/services`,
@@ -119,7 +119,7 @@ the domain write): `org:created|updated|archived|deleted`,
 `service:updated`, `audit:recorded`. The shell-spawned relay pushes rows to
 Bus `POST /v1/produce` and marks them relayed. Identity-invalidation events
 ride the `policy` family (`sentin8:sys:identity:updated`,
-`sentin8:sys:policy:updated` — payload-complete envelopes so consumers
+`sentin8:sys:policy:updated` - payload-complete envelopes so consumers
 reload without callbacks).
 
 Post-commit MemBus notifications (`domain_events.rs`) publish
@@ -150,8 +150,8 @@ outage degrades to their safety poll and never fails the mutation.
   is a fundamental platform operation; its cross-service span is two
   idempotent auth-API calls. Executing them in-handler with a
   compensating delete keeps 200 meaning "fully provisioned" (the caller
-  needs no retry/settle logic). The alternative — delegating to a
-  workflow engine — put a saga hop on the critical path, introduced a
+  needs no retry/settle logic). The alternative - delegating to a
+  workflow engine - put a saga hop on the critical path, introduced a
   read-your-writes window (200 before membership existed), and still
   left the same two-call crash window. Flow is for long-running
   multi-step business workflows, not fundamental lifecycles.
@@ -163,7 +163,7 @@ outage degrades to their safety poll and never fails the mutation.
 - **Audit in the same transaction, event emissions in the same
   transaction, MemBus notifications strictly post-commit.** The audit row
   and the outbox row must never survive without the domain change (or
-  vice versa) — a crash between statements loses the whole transaction.
+  vice versa) - a crash between statements loses the whole transaction.
   MemBus is best-effort by contract (subscribers have safety polls).
 - **Audit row's env is the caller's env.** Handlers that act on a target
   env different from the caller's set their transaction context to the
@@ -175,7 +175,7 @@ outage degrades to their safety poll and never fails the mutation.
 - **Ephemeral MemBus for resolver invalidation, durable bus events for
   lifecycle.** Resolvers need freshness, not durability (a missed
   notification is healed by their periodic poll); lifecycle reactions
-  (e.g. env-init seeding) need durability and auditing — hence the outbox
+  (e.g. env-init seeding) need durability and auditing - hence the outbox
   + Bus produce path for those.
 
 ## 6. Internal Implementation & Invariants (Private Design)
@@ -195,23 +195,23 @@ outage degrades to their safety poll and never fails the mutation.
 3. **Org/env creation is synchronous in-process.** The create handler
    commits the record (with its lifecycle outbox row), provisions the
    access model through auth's API, writes the identity-invalidation
-   outbox row, then returns 200 — the caller's next request already
+   outbox row, then returns 200 - the caller's next request already
    carries its membership. A provisioning failure compensates by deleting
    the record (500); a caller retry starts clean.
 4. **Platform-initiated calls use the derived platform hostname**
    (`sys.ops.sys.{sentin8_domain}` + captain-assigned port), never
-   `localhost` — the listener is PQ-TLS SNI-routed, so callers must
+   `localhost` - the listener is PQ-TLS SNI-routed, so callers must
    present the registered hostname.
 5. **Invitation acceptance is email-bound**: the token must carry the
    invited email; the group assignment rides auth's provisioning API and
-   the write fails (409) when the access model was never provisioned —
+   the write fails (409) when the access model was never provisioned -
    acceptance never fabricates groups.
 6. **Org access checks never join auth tables.** `authorize_org` accepts
    platform admins (scope `sentin8:sys:admin`), delegated tokens whose env
    matches the target, and otherwise reads the caller's live GROUP
    listing from auth's API, matching the org-embedded
    `sentin8:org:{org_id}:owners|admins|viewers` group names provisioning
-   assigns. (Role names are realm-static — matching on them would
+   assigns. (Role names are realm-static - matching on them would
    cross-admit every org's members.)
 7. **Branding merge is layer-priority**: env override first, then org
    base, non-empty wins; `merged` is read-only.
@@ -226,7 +226,7 @@ outage degrades to their safety poll and never fails the mutation.
 
 - The bootstrap surface keeps the shared shape as the contract; per-app
   dashboards are RFW pages served by the owning service and discovered via the
-  runtime context — the bootstrap endpoint stays platform-level by design.
+  runtime context - the bootstrap endpoint stays platform-level by design.
 
 ---
 

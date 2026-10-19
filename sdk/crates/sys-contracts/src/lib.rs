@@ -5,7 +5,7 @@
 
 //! # sys-contracts
 //!
-//! Rust types for the Sys control-plane HTTP API — tenant model
+//! Rust types for the Sys control-plane HTTP API - tenant model
 //! (organizations, environments) and the platform scope vocabulary.
 
 #![deny(missing_docs)]
@@ -46,13 +46,13 @@ pub struct Environment {
     pub status: String,
 }
 
-/// `GET /v1/scopes/catalog` — platform-wide list of well-known OAuth
+/// `GET /v1/scopes/catalog` - platform-wide list of well-known OAuth
 /// scopes. Returned as the default suggestion set for the
 /// `ScopeSelector` widget in Dash. Apps may still enter arbitrary
 /// `service:resource[:action]` scopes that are not in this list.
 ///
 /// This is intentionally a separate endpoint (not a per-org/per-env
-/// setting) because scopes are a platform-level vocabulary — the same
+/// setting) because scopes are a platform-level vocabulary - the same
 /// set applies to every org and every env.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ScopeCatalog {
@@ -61,13 +61,13 @@ pub struct ScopeCatalog {
     pub scopes: Vec<String>,
 }
 
-/// The platform's well-known OAuth scope vocabulary — the single source of
+/// The platform's well-known OAuth scope vocabulary - the single source of
 /// truth shared by sys's `GET /v1/scopes/catalog` endpoint and auth's
 /// mTLS-bound DCR scope-grant evaluation (a
 /// `sentin8_auth_m2m_scope_grants.allowed_scopes` entry may only contain
 /// scopes from this list ∪ runtime-registered `service_actions` scopes ∪
 /// the OIDC baseline, so grants can never mint an out-of-vocabulary scope).
-/// Uniform naming: every scope starts with its vertical — the platform
+/// Uniform naming: every scope starts with its vertical - the platform
 /// vertical uses the literal `sentin8:` prefix. Sorted alphabetically for
 /// deterministic output.
 pub const PLATFORM_SCOPE_VOCABULARY: &[&str] = &[
@@ -96,11 +96,11 @@ pub const PLATFORM_SCOPE_VOCABULARY: &[&str] = &[
     // Bus (produce/consume are the service-principal workhorses)
     "sentin8:bus:consume",
     "sentin8:bus:produce",
-    // Stat ingest (M2M-only measurement ingestion — the per-service
+    // Stat ingest (M2M-only measurement ingestion - the per-service
     // `{short}-policy` stat emitters and stat workloads claim it at DCR;
     // granted to M2M clients, never to user roles).
     "sentin8:stat:measure",
-    // Policy-admin surface — one scope pair per platform service (the
+    // Policy-admin surface - one scope pair per platform service (the
     // resource is that service's policy-admin surface, so the resource
     // segment names the OWNING service, not `policy`). Vertical services
     // register their own pair via `vertical enroll`.
@@ -172,7 +172,7 @@ pub const PLATFORM_SCOPE_VOCABULARY: &[&str] = &[
     "sentin8:storage:objects:write",
 ];
 
-/// Env-wide visibility across holder-scoped records — M2M-only.
+/// Env-wide visibility across holder-scoped records - M2M-only.
 /// Registered-but-ungranted by default: no seed grants it; an M2M client
 /// must claim it at DCR time. Kept as a separate const so the RLS policy
 /// clauses and the SDK primitive reference the same literal.
@@ -205,7 +205,7 @@ mod tests {
 
     #[test]
     fn environment_type_renamed_from_type_field() {
-        // `type` is a Rust keyword — the wire field must remain "type".
+        // `type` is a Rust keyword - the wire field must remain "type".
         let e = Environment {
             id: uuid::Uuid::new_v4(),
             org_id: uuid::Uuid::new_v4(),
@@ -233,7 +233,7 @@ mod tests {
         let v = serde_json::to_value(&c).unwrap();
         let back: ScopeCatalog = serde_json::from_value(v).unwrap();
         assert_eq!(back.scopes, c.scopes);
-        // Scope shape convention: vertical:service:resource:action —
+        // Scope shape convention: vertical:service:resource:action -
         // every scope starts with its vertical; platform scopes carry the
         // literal `sentin8` segment.
         for s in &back.scopes {

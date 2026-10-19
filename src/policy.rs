@@ -33,7 +33,7 @@ pub fn engine() -> Arc<Engine> {
 ///
 /// The bus `identity:updated` event is the fleet-wide invalidation
 /// channel, but it is asynchronous (outbox → relay → bus → policy
-/// SSE) and reaches sys's own consumer seconds after the 200 — while
+/// SSE) and reaches sys's own consumer seconds after the 200 - while
 /// the create request's own Shield evaluation has already primed the
 /// per-process resolver with the creator's PRE-grant identity (empty
 /// scopes, 30 s TTL). Without this sweep, the very next request in the

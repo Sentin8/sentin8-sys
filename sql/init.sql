@@ -3,7 +3,7 @@
 -- SPDX-FileCopyrightText: Copyright Contributors to the Sentin8:Sys
 -- SPDX-License-Identifier: Apache-2.0
 
--- Sentin8 platform schema — Sentin8:Sys system tables (not tenant-scoped).
+-- Sentin8 platform schema - Sentin8:Sys system tables (not tenant-scoped).
 -- These tables are owned by Sentin8:Sys and store organization, environment, and
 -- application binding records. They also include per-app instance overrides
 
@@ -47,13 +47,13 @@ CREATE TABLE IF NOT EXISTS sys.app_environment_bindings (
     UNIQUE (org_id, env_id, slug)
 );
 
--- RLS (mandatory on every tenant data table — architecture-principles
+-- RLS (mandatory on every tenant data table - architecture-principles
 -- §4.3d): the binding row is env-scoped; the write
 -- policies admit any initialized context (sys's own provisioning handlers
 -- run under delegated context), the SELECT policy additionally admits the
--- platform plane (system env) — same shape as sys_services_select.
+-- platform plane (system env) - same shape as sys_services_select.
 
--- Sentin8:App instances table — maps hostnames to org/env/application.
+-- Sentin8:App instances table - maps hostnames to org/env/application.
 
 CREATE TABLE IF NOT EXISTS sys.app_instances (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -68,10 +68,10 @@ CREATE TABLE IF NOT EXISTS sys.app_instances (
     domain_type     TEXT NOT NULL DEFAULT 'default' CHECK (domain_type IN ('default', 'custom')),
     status          TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('provisioning', 'active', 'maintenance', 'offline')),
     oauth_client_id TEXT,
-    -- Staff-mode CIBA client (BFF design — the app-instance CIBA
+    -- Staff-mode CIBA client (BFF design - the app-instance CIBA
     -- backchannel client, public PKCE). When the instance is staff-mode
     -- (auth_domain set), the sign-in client above is registered at the
-    -- STAFF auth, but CIBA bc-authorize targets the CUSTOMER env's auth —
+    -- STAFF auth, but CIBA bc-authorize targets the CUSTOMER env's auth -
     -- where a SEPARATE registration of the same instance client is
     -- required. Empty when the instance is not staff-mode (the single
     -- env-scoped registration is shared by both flows).
@@ -112,7 +112,7 @@ CREATE TABLE IF NOT EXISTS sys.services (
 );
 
 -- Memberships: now managed via Sentin8:Auth RBAC (sentin8_auth_user_roles + sentin8_auth_group_members).
--- The old sentin8_sys_memberships table has been removed — org access is determined
+-- The old sentin8_sys_memberships table has been removed - org access is determined
 -- by role assignments and group memberships in the RBAC model.
 
 -- Invitations table
@@ -128,7 +128,7 @@ CREATE TABLE IF NOT EXISTS sys.invitations (
 );
 
 -- Sys's `POST /v1/audit` ingest API; `service` is stamped by Sys from the
--- verified M2M `client_id` — never caller-supplied. The former
+-- verified M2M `client_id` - never caller-supplied. The former
 -- `sys.sys_audit_events` orchestration-local table and Stat's shared
 -- `sentin8.audit_events` are both absorbed here.
 CREATE TABLE IF NOT EXISTS sys.audit_events (
@@ -155,7 +155,7 @@ CREATE INDEX IF NOT EXISTS idx_audit_events_service ON sys.audit_events (service
 CREATE INDEX IF NOT EXISTS idx_audit_events_env ON sys.audit_events (env_id, timestamp DESC);
 CREATE INDEX IF NOT EXISTS idx_audit_events_correlation ON sys.audit_events (correlation_id) WHERE correlation_id IS NOT NULL;
 
--- Branding table — hierarchical branding overrides.
+-- Branding table - hierarchical branding overrides.
 -- scope: 'org' (org-level), 'env' (env-level).
 -- Branding is merged hierarchically: env overrides org for each field.
 -- Fields that are null/empty at a level fall through to the next level up.
@@ -206,9 +206,9 @@ CREATE POLICY sys_organizations_delete ON sys.organizations FOR DELETE
 
 ALTER TABLE sys.environments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sys.environments FORCE ROW LEVEL SECURITY;
--- SELECT: the caller may read its OWN env row (id = app.env_id — needed for
+-- SELECT: the caller may read its OWN env row (id = app.env_id - needed for
 -- predicate required sentin8_bypass_rls(), which the Delegation Gateway model
--- retired (always returns false) — the lookup was dead for every
+-- retired (always returns false) - the lookup was dead for every
 -- NOBYPASSRLS service role, caught by the revived auth conformance tests.
 DROP POLICY IF EXISTS sys_environments_select ON sys.environments;
 CREATE POLICY sys_environments_select ON sys.environments FOR SELECT
@@ -219,10 +219,10 @@ CREATE POLICY sys_environments_select ON sys.environments FOR SELECT
                 OR sentin8_current_env_id() = '00000000-0000-0000-0000-000000000002'::uuid));
     -- The SYSTEM-env clause is the platform plane (mirrors the
     -- sys_organizations_select policy shape): platform services run with
-    -- SYSTEM_ENV_ID context, and every env row must be visible to them —
+    -- SYSTEM_ENV_ID context, and every env row must be visible to them -
     -- most importantly the row an INSERT ... RETURNING just created (its
     -- tenant org_id never equals the system-org current_org_id, and its
-    -- fresh uuid never equals the SYSTEM env id — the RETURNING read
+    -- fresh uuid never equals the SYSTEM env id - the RETURNING read
     -- re-checks the SELECT policy, so the clause is required for the
     -- write to report its own row back.
 -- INSERT/UPDATE/DELETE: Sentin8:Sys handlers own env lifecycle (org/env
@@ -277,13 +277,13 @@ CREATE POLICY sys_services_delete ON sys.services FOR DELETE
 ALTER TABLE sys.app_instances ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sys.app_instances FORCE ROW LEVEL SECURITY;
 -- Lookup policy: a caller may read instances of its own env, or any env of
--- the org its env belongs to — Auth (tenant resolution from hostname), BFF
+-- the org its env belongs to - Auth (tenant resolution from hostname), BFF
 -- (per-app scope whitelist) and App (runtime context) all resolve app
 -- instances for hostnames in the caller's org. The SYSTEM-env clause is the
 -- platform plane (mirrors sys_environments_select / sys_organizations_select):
 -- platform services resolving an app instance by HOSTNAME (auth-mode lookup,
 -- tenant resolution, domain catalog) run with SYSTEM_ENV_ID context and must
--- see every tenant's instance rows — hostname lookups cannot know the
+-- see every tenant's instance rows - hostname lookups cannot know the
 -- caller's org in advance. The bypass clause is inert (always false) but
 -- retained for consistency with sibling policies.
 DROP POLICY IF EXISTS sys_instances_select ON sys.app_instances;
@@ -380,7 +380,7 @@ DROP TRIGGER IF EXISTS app_domain_notify ON sys.app_instances;
 -- sentin8_app_service: app instance lifecycle management.
 GRANT SELECT, INSERT, UPDATE, DELETE ON sys.app_instances TO sentin8_app_service;
 -- Sentin8:App resolves env→org (runtime context, install dropdown, RBAC
--- target-env validation) — read-only access to the org/env lookup tables.
+-- target-env validation) - read-only access to the org/env lookup tables.
 GRANT SELECT ON sys.environments, sys.organizations TO sentin8_app_service;
 
 -- (send_invitation/accept_invitation handlers here); auth's admin UI
@@ -392,14 +392,14 @@ GRANT SELECT ON sys.services, sys.environments TO sentin8_func_service;
 -- Bootstrap data: System Organization, System Environment, the Dash app
 -- instance, and the Dash group + role in the auth env. Idempotent.
 --
--- System UUIDs (constants — see crates/sentin8-config):
+-- System UUIDs (constants - see crates/sentin8-config):
 --   System Org ID  = 00000000-0000-0000-0000-000000000001
 --   System Env ID  = 00000000-0000-0000-0000-000000000002
 
 -- ── System Organization ──────────────────────────────────────────────
 -- The sys org owns platform operator users. It is not tenant-scoped
 -- data, but it must exist so RLS queries resolve correctly.
--- `domain` is NOT NULL — the sys org uses the default platform pattern
+-- `domain` is NOT NULL - the sys org uses the default platform pattern
 -- `sys.{sentin8.domain}` (see Sentin8Config::org_domain). The domain is
 -- passed as a psql variable (`sentin8.domain`) from db-reset.sh so it
 -- matches the SENTIN8_DOMAIN env var at seed time.
@@ -438,7 +438,7 @@ ON CONFLICT (id) DO UPDATE SET
 -- The password hash below is bcrypt (cost 10) for "pass", generated
 -- with the `bcrypt = "0.15"` crate (the same crate auth uses) and
 -- verified with `bcrypt::verify("pass", hash)`. Do NOT change this
--- hash — it is the bootstrap admin password for all environments.
+-- hash - it is the bootstrap admin password for all environments.
 
 -- ── Dash app installation (sys/ops) ───────────────────────────────────
 -- Sentin8:Dash is installed as an app instance in sys/ops, just like any
@@ -453,7 +453,7 @@ INSERT INTO sys.app_instances
      listing_id, status, auth_domain, allow_signup, group_gate)
 SELECT
     -- (sentin8:app:{instance_id}[_\:role]) key on this id, and the BFF
-    -- gate resolves the group from the seeded instance lookup — so the
+    -- gate resolves the group from the seeded instance lookup - so the
     -- seed must be deterministic (no gen_random_uuid()).
     '00000000-0000-0000-0000-00000000000a',
     '00000000-0000-0000-0000-000000000001',
@@ -488,7 +488,7 @@ WHERE org_id = '00000000-0000-0000-0000-000000000001'
   AND group_gate <> 'self_service';
 
 -- listing_id for the dash instance: the INSERT above leaves it NULL when
--- the listing is seeded later (or by a different service SQL pass) — backfill
+-- the listing is seeded later (or by a different service SQL pass) - backfill
 -- by app_slug (idempotent; only fills NULLs).
 UPDATE sys.app_instances i
 SET listing_id = l.id
@@ -505,7 +505,7 @@ WHERE i.org_id = '00000000-0000-0000-0000-000000000001'
 -- login scope resolution fell back to the OIDC baseline only, so session
 -- tokens never carried `sentin8:app:store:admin` and every store mutation 403'd.
 -- Single source of truth: read the scopes from the referenced listing row
--- (CTE — no LATERAL reference into the UPDATE target).
+-- (CTE - no LATERAL reference into the UPDATE target).
 WITH listing_scopes AS (
     SELECT i.id AS instance_id,
            ARRAY(
@@ -538,9 +538,9 @@ WHERE i.id = ls.instance_id
 -- group membership at session creation for every app instance
 -- provision its group in the auth env (sys/ops) with a role carrying
 -- the listing's oauth_defaults.scopes, and add the bootstrap admin as
--- a member. Idempotent — safe to re-run on every seed.
+-- a member. Idempotent - safe to re-run on every seed.
 --
--- keyed by the instance UUID — app setup_instance, the BFF gate, and
+-- keyed by the instance UUID - app setup_instance, the BFF gate, and
 -- the Flutter SDK all read the same `app_instances.id`. The dash
 -- seed pins the instance row to the fixed UUID
 -- '00000000-0000-0000-0000-00000000000a', so the group/role names
@@ -650,7 +650,7 @@ CREATE POLICY sentin8_policy_sets_delete ON sys.policy_sets FOR DELETE
 -- Every adopting service reads its own rows (PolicyEngine::load). The boot
 -- load runs BEFORE any tenant context exists, so RLS
 -- (`sentin8_context_initialized()`) would hide every row from per-service
--- OAuth roles — the COLD-START-1 class. Services load through the dedicated
+-- OAuth roles - the COLD-START-1 class. Services load through the dedicated
 -- `sentin8_boot_policy_load(service)` SECURITY DEFINER function below
 GRANT SELECT ON sys.policy_sets TO sentin8_post_service, sentin8_sys_service, sentin8_flow_service, sentin8_bus_service;
 GRANT SELECT, INSERT, UPDATE, DELETE ON sys.policy_sets TO sentin8_sys_service;
@@ -659,7 +659,7 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON sys.policy_sets TO sentin8_sys_service;
 -- with `origin = 'tenant'`; post's admin API writes them through its own
 -- M2M role. RLS (`sentin8_context_initialized()`) still bounds every row to
 -- the caller's tenant, and the handlers' predicates keep `service =
--- 'sentin8:post'` — the grant cannot touch other services' rows.
+-- 'sentin8:post'` - the grant cannot touch other services' rows.
 
 -- `PolicyEngine::load` runs at service boot, before any tenant context is
 -- set. The table's RLS policy gates on `sentin8_context_initialized()`, so a
@@ -670,7 +670,7 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON sys.policy_sets TO sentin8_sys_service;
 -- service can only ever load its own rows (owner RLS is bypassed only for
 -- this exact filter), and it is granted EXECUTE to every service role.
 -- The admin API keeps reading the table directly under the caller's request
--- context — RLS on the table itself is unchanged.
+-- context - RLS on the table itself is unchanged.
 CREATE OR REPLACE FUNCTION public.sentin8_boot_policy_load(p_service TEXT)
 RETURNS TABLE (
     id              UUID,
@@ -695,7 +695,7 @@ $func$;
 -- EXECUTE for the shared dev role + every existing and future PLATFORM
 -- service role (the dynamic loop covers late-created platform roles).
 -- Vertical services boot-load from their OWN database's substrate copy
--- (VDC-5) — the platform copy's EXECUTE stays platform-only (VDC-7).
+-- (VDC-5) - the platform copy's EXECUTE stays platform-only (VDC-7).
 GRANT EXECUTE ON FUNCTION public.sentin8_boot_policy_load(TEXT) TO sentin8_app_dev;
 DO $$
 DECLARE
@@ -716,7 +716,7 @@ END $$;
 -- entity graph. Loaded per (env_id, service) as Shield entity-hierarchy
 -- `parents` edges at evaluation time; policies use the `in` operator
 -- (`principal in Group::"fx-ops"`). Size-capped by the loader
--- (RELATION_SLICE_CAP — over-cap fails the load, which denies in enforced
+-- (RELATION_SLICE_CAP - over-cap fails the load, which denies in enforced
 -- mode). Hot-reload via `sentin8:sys:policy:relations:updated`.
 --
 -- origin: 'platform' tuples come from vertical-registry.json `relations`
@@ -756,10 +756,10 @@ CREATE POLICY sentin8_policy_relations_delete ON sys.policy_relations FOR DELETE
 --
 -- Identity-adjacent attributes (department, clearance, vip, employment type)
 -- for the principal side of attribute rules. Resource attributes are NOT
--- stored here — services supply them on the EvalTarget at the call site
+-- stored here - services supply them on the EvalTarget at the call site
 -- (payload completeness; no duplicate attribute store). Injected into the
 -- evaluation context at request time; hot-reload is not needed (rows are
--- read per evaluation from the DB — attributes are small and change rarely).
+-- read per evaluation from the DB - attributes are small and change rarely).
 -- The `sentin8:sys:policy:attrs:updated` event tells admin UIs to refresh;
 -- services reading per-request always see fresh values.
 -- ═══════════════════════════════════════════════════════════════════════════
@@ -803,15 +803,15 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON sys.policy_principal_attrs TO sentin8_po
 -- inside EVERY adopting service's process and reads these platform tables
 -- per request under the service's own role (crates/policy/src/substrate.rs
 -- `load_relations` / `load_principal_attrs`). The four-role grants above are
--- historical only — under per-service DSNs every `*_service` role that boots
+-- historical only - under per-service DSNs every `*_service` role that boots
 -- Shield needs SELECT on both tables or the evaluation degrades (warns
 -- `permission denied` + evaluates without hierarchy edges/attrs). RLS on the
 -- tables (`sentin8_context_initialized()`) still bounds every read to the
 -- caller's tenant; the grant only enables the engine's in-process evaluation.
--- — no direct table grant here. Dynamic loop mirrors that function's EXECUTE
+-- - no direct table grant here. Dynamic loop mirrors that function's EXECUTE
 -- loop so late-created platform roles are covered too.
 -- VDC-7 (design/sentin8-vertical-data-plane-contract.md §VDC.7): PLATFORM
--- roles only — a vertical domain role reads its Shield substrate from the
+-- roles only - a vertical domain role reads its Shield substrate from the
 -- VERTICAL database's local copy (VDC-5), never from the platform tables.
 DO $$
 DECLARE
@@ -876,7 +876,7 @@ CREATE TRIGGER outbox_notify_trigger
 -- Queue for Sentin8:Post notifications (invitation sent/accepted mails).
 -- Producers enqueue here in the SAME transaction as the domain change;
 -- the sys-post pusher drains it to POST post /v1/send (M2M, scope
--- sentin8:post:write) — no direct post.inbox writes, no cross-schema
+-- sentin8:post:write) - no direct post.inbox writes, no cross-schema
 -- INSERT grant on Post's internal tables. RLS is env-scoped: the row's
 -- env_id is the ORG's env, written under the caller's context (same-tx
 -- discipline with the invitation INSERT it accompanies).
@@ -949,7 +949,7 @@ CREATE POLICY audit_journal_dml ON sys.audit_journal
     WITH CHECK (sentin8_context_initialized() AND env_id = sentin8_current_env_id());
 
 
--- ── Schema grants (service-owned — the 2026-10-03 ownership pass) ─────
+-- ── Schema grants (service-owned - the 2026-10-03 ownership pass) ─────
 -- This service's own schema: USAGE for its role (platform.sql no longer
 -- seeds per-service USAGE; the service declares it here).
 GRANT USAGE ON SCHEMA sys TO sentin8_sys_service;
@@ -962,7 +962,7 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON sys.audit_journal TO sentin8_sys_service
 -- These two tables are created on demand by the CLI during `vertical
 -- enroll` (they hold verticals' runtime-registered event trigger
 -- declarations and error codes; no owned DDL in sys's init) and may not
--- exist on a fresh platform — the GRANT is guarded (a bare GRANT on a
+-- exist on a fresh platform - the GRANT is guarded (a bare GRANT on a
 -- missing table aborts the whole init migration on a fresh bootstrap).
 DO $$
 BEGIN

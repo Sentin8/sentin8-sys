@@ -3,7 +3,7 @@
 // SPDX-FileCopyrightText: Copyright Contributors to the Sentin8:Sys
 // SPDX-License-Identifier: Apache-2.0
 
-//! Sys HTTP handlers — org/env/feature/application/binding/membership/audit.
+//! Sys HTTP handlers - org/env/feature/application/binding/membership/audit.
 //!
 //! Stories.
 //!
@@ -36,7 +36,7 @@ pub struct AppState {
     pub config: Arc<SysConfig>,
     /// The pool.
     pub pool: PgPool,
-    /// Shield engine ( — ): additional gate after scope.
+    /// Shield engine ( - ): additional gate after scope.
     /// The policy.
     pub policy: Arc<crate::policy::Engine>,
     /// The  workload registry map (boot-loaded + TTL-cached):
@@ -51,19 +51,19 @@ pub struct AppState {
 // ── Helpers ──────────────────────────────────────────────────────────────
 
 /// Insert an audit row on an ALREADY-OPEN connection/transaction (same
-/// transaction as the domain change — sys design ). Failures are
+/// transaction as the domain change - sys design ). Failures are
 /// logged at error level with never silently discarded.
 ///
 /// RLS: the audit row's env IS the caller's env (`auth.claims.env_uuid()`),
 /// while the surrounding handler transaction often runs under the TARGET
-/// env's context (path-parameter `env_id` — the caller may be a platform
+/// env's context (path-parameter `env_id` - the caller may be a platform
 /// admin acting on another tenant). The FORCE-RLS insert policy requires
 /// `env_id = sentin8_current_env_id()` (or NULL), so the context is set to
 /// the audit row's own env immediately before the INSERT. `set_config(…,
 /// true)` is transaction-local, so this also RE-SCOPES the caller's
 /// remaining statements in the transaction: every `audit_tx` call site is
 /// the LAST domain write before the emit block, which re-sets its own
-/// context (the system env) anyway — the swap is safe for both.
+/// context (the system env) anyway - the swap is safe for both.
 async fn audit_tx(
     conn: &mut sqlx::PgConnection,
     auth: &AuthContext,
@@ -99,15 +99,15 @@ async fn audit_tx(
         return;
     }
     // Fan-out: `sentin8:sys:audit:recorded` on the local outbox, SAME
-    // transaction (sys DESIGN §4 — `audit:recorded` is a family-sys event;
+    // transaction (sys DESIGN §4 - `audit:recorded` is a family-sys event;
     // Stat's audit-volume consumer aggregates every row, whether it
     // entered through `POST /v1/audit` or an internal `audit_tx` write).
     //
-    // ENV CONTRACT: the outbox row carries SYSTEM_ENV_ID — the shell's
+    // ENV CONTRACT: the outbox row carries SYSTEM_ENV_ID - the shell's
     // relay produces with sys's M2M token, which is bound to the system
     // env; a caller-env row makes Bus reject the produce with 403
     // (cross-tenant) and the relay would hot-loop it forever. The target
-    // env rides the payload (`env_id`) — payload completeness for Stat's
+    // env rides the payload (`env_id`) - payload completeness for Stat's
     // consumer. The nil→system context swap is safe here: this is the
     // LAST write in the transaction and no further statement reads
     // tenant-filtered rows. Best-effort: a failed emission degrades to a
@@ -145,11 +145,11 @@ async fn audit(
     before: Option<serde_json::Value>,
     after: Option<serde_json::Value>,
 ) {
-    // No connection acquisition needed — the transaction below comes from
+    // No connection acquisition needed - the transaction below comes from
     // the pool directly (the acquire+drop pattern wasted a connection slot).
     // Same-connection tenant context in an EXPLICIT transaction :
     // `audit_tx` writes to the FORCE-RLS'd `sys.audit_events` whose INSERT
-    // policy requires `sentin8_context_initialized` — set_config(..., true)
+    // policy requires `sentin8_context_initialized` - set_config(..., true)
     // is TRANSACTION-local, so the context set + INSERT must share one
     // transaction; on a bare autocommit connection the context evaporates
     // between statements ("new row violates row-level security policy",
@@ -188,12 +188,12 @@ fn err_db(e: sqlx::Error) -> (StatusCode, String) {
 
 /// Resolve `org_id` from `env_id` via `sentin8_sys_environments`.
 /// Used by env-scoped handlers that no longer receive `org_id` as a path
-/// parameter — `env_id` is globally unique and sufficient to identify the
+/// parameter - `env_id` is globally unique and sufficient to identify the
 /// owning organization.
 async fn resolve_org_id(pool: &PgPool, env_id: Uuid) -> Result<Uuid, (StatusCode, String)> {
     // Same-connection tenant-context rule (sys design ): the context
     // must be set on the connection that runs the query, and it must be the
-    // TARGET env — sys_environments_select admits `id = app.env_id` only.
+    // TARGET env - sys_environments_select admits `id = app.env_id` only.
     // The context is transaction-local (`set_config(..., true)`), so both
     // statements run inside one explicit transaction ( rule 2).
     let mut tx = pool.begin().await.map_err(err_db)?;
@@ -222,7 +222,7 @@ async fn set_rls_context(conn: &mut sqlx::PgConnection, env_id: Uuid) {
 /// Insert a `inbox` row on an ALREADY-OPEN connection/transaction.
 ///
 /// The inbox-first rule (sys design ) requires the event row to be
-/// written in the SAME transaction as the domain change — an event written
+/// written in the SAME transaction as the domain change - an event written
 /// on a separate autocommit connection after the domain transaction commits
 /// is silently lost if the process dies between the two statements. The
 /// caller must have set the tenant context on this same connection.
@@ -241,7 +241,7 @@ async fn emit_sentin8_sys_event_tx(
 }
 
 /// Emit an identity-invalidation event on the `policy` stream (policy design
-/// -1). DBX : producers never touch bus.inbox — the row lands in
+/// -1). DBX : producers never touch bus.inbox - the row lands in
 /// sys's LOCAL outbox (family `policy`); the shell-spawned relay pushes it to
 /// Bus `POST /v1/produce`. Best-effort: a failed emission degrades to the
 /// 30s resolver TTL (the contract's backstop), never blocks the provisioning
@@ -266,11 +266,11 @@ async fn emit_policy_identity_event_tx(
 /// `POST /v1/send` (M2M, `sentin8:post:write`). Must run on the SAME
 /// transaction/connection as the domain change (exactly-once coupling);
 /// the row's `env_id` is the ORG's env and `sys.post_outbox`'s RLS policy
-/// matches on it — the helper re-sets the tenant context to `env_id` on
+/// matches on it - the helper re-sets the tenant context to `env_id` on
 /// THIS transaction (transaction-local; the preceding platform-plane
 /// outbox emit needs SYSTEM, so the caller's context can't be assumed).
 /// Best-effort: a failed enqueue logs and continues (the invitation
-/// itself still commits — mail is a best-effort side channel, never a
+/// itself still commits - mail is a best-effort side channel, never a
 /// gate).
 async fn emit_post_notification_tx(
     conn: &mut sqlx::PgConnection,
@@ -304,7 +304,7 @@ async fn emit_post_notification_tx(
 
 // ── Operational (Stories) ───────────────────────────────────
 
-/// `GET /v1/health` — liveness probe.
+/// `GET /v1/health` - liveness probe.
 #[utoipa::path(
     get,
     path = "/v1/health",
@@ -320,7 +320,7 @@ pub async fn health(State(_state): State<AppState>) -> Json<serde_json::Value> {
     Json(payload)
 }
 
-/// `GET /v1/readiness` — readiness probe.
+/// `GET /v1/readiness` - readiness probe.
 #[utoipa::path(
     get,
     operation_id = "readiness.get",
@@ -351,20 +351,20 @@ pub async fn readiness(
     })))
 }
 
-/// `GET /v1/verticals/services?orgId={uuid}&envId={uuid}` — discover registered
+/// `GET /v1/verticals/services?orgId={uuid}&envId={uuid}` - discover registered
 /// vertical services and their admin_ui entries, filtered by feature enablement
 /// for the given org/env.
 ///
 /// Used by Sentin8:Dash at boot to build the dynamic sidebar. Returns an array
 /// of vertical descriptors, each containing:
-/// - `service` — the service type (e.g. `bank8-ledger`, `bank8-payments`)
-/// - `label` — display label (e.g. "Ledger")
-/// - `icon` — material icon name
-/// - `service_flag` — the service that must be enabled (e.g. "ledger")
-/// - `enabled` — whether the feature is enabled for this org/env
-/// - `pages` — array of admin_ui page definitions (route, label, ui_endpoint, data_endpoint)
+/// - `service` - the service type (e.g. `bank8-ledger`, `bank8-payments`)
+/// - `label` - display label (e.g. "Ledger")
+/// - `icon` - material icon name
+/// - `service_flag` - the service that must be enabled (e.g. "ledger")
+/// - `enabled` - whether the feature is enabled for this org/env
+/// - `pages` - array of admin_ui page definitions (route, label, ui_endpoint, data_endpoint)
 /// See `sentin8-.md` for the Remote UI architecture.
-/// `GET /v1/verticals/services` — discover registered vertical services.
+/// `GET /v1/verticals/services` - discover registered vertical services.
 #[utoipa::path(
     get,
     path = "/v1/verticals/services",
@@ -395,7 +395,7 @@ pub async fn list_vertical_services(
     let env_id = params.env_id;
 
     // Validate org membership if org_id is provided. Skip the check for
-    // the system org — the vertical services list is UI metadata (not
+    // the system org - the vertical services list is UI metadata (not
     // tenant data) and any staff user with sys:*:admin scopes needs to
     // see the sidebar. authorize_org blocks non-platform-admins from
     // accessing the system org, but vertical services is a discovery
@@ -548,7 +548,7 @@ pub struct VerticalServiceResponse {
 /// Platform-only OAuth scope catalog returned by `GET /v1/scopes/catalog`.
 ///
 /// Kept in lock-step with `_kDefaultScopeSuggestions` in
-/// `apps/dash/lib/widgets/scope_selector.dart` — the Dart widget falls
+/// `apps/dash/lib/widgets/scope_selector.dart` - the Dart widget falls
 /// back to that hardcoded list when the catalog endpoint is unreachable
 /// (offline mode, no auth, etc.), so the two lists should be the same
 /// set. We sort alphabetically for stable output (and so the autocomplete
@@ -568,7 +568,7 @@ pub const PLATFORM_SCOPE_CATALOG: &[&str] = &[
     "sentin8:auth:actor:issue",
     "sentin8:auth:admin:read",
     "sentin8:auth:admin:write",
-    // Policy-admin surface — one scope pair per platform service (policy
+    // Policy-admin surface - one scope pair per platform service (policy
     // design ; naming). Vertical pairs arrive via enroll.
     "sentin8:acme:policy:read",
     "sentin8:acme:policy:write",
@@ -609,7 +609,7 @@ pub const PLATFORM_SCOPE_CATALOG: &[&str] = &[
     "sentin8:db:tables:write",
 ];
 
-/// `GET /v1/scopes/catalog` — returns the platform's well-known OAuth
+/// `GET /v1/scopes/catalog` - returns the platform's well-known OAuth
 /// scope catalog as a flat list. Used by Dash's `ScopeSelector`
 /// widget to populate its autocomplete suggestions without
 /// duplicating the list on the client side.
@@ -619,7 +619,7 @@ pub const PLATFORM_SCOPE_CATALOG: &[&str] = &[
 /// keeps the suggestions available even before sign-in (e.g. on a
 /// public marketing page that links to a sign-up form with scope
 /// hints).
-/// `GET /v1/scopes/catalog` — platform OAuth scope catalog.
+/// `GET /v1/scopes/catalog` - platform OAuth scope catalog.
 #[utoipa::path(
     get,
     path = "/v1/scopes/catalog",
@@ -695,7 +695,7 @@ pub struct UpdateOrgRequest {
     pub display_name: Option<String>,
     /// The status.
     pub status: Option<String>,
-    /// Optional domain update — triggers domain chaining via TLS.
+    /// Optional domain update - triggers domain chaining via TLS.
     /// `None` or empty = no change; `Some(val)` = update.
     /// Serialized as `custom_domain` for API compatibility with the frontend.
     #[serde(default, rename = "custom_domain")]
@@ -723,7 +723,7 @@ impl Default for ListQuery {
     }
 }
 
-/// `POST /v1/o` — create organization.
+/// `POST /v1/o` - create organization.
 #[utoipa::path(
     post,
     operation_id = "org.create",
@@ -798,7 +798,7 @@ pub async fn create_org(
     };
     set_rls_context(&mut tx, sentin8::config::SYSTEM_ENV_ID).await;
     // VDC-3 (design/sentin8-vertical-data-plane-contract.md §VDC.4): the
-    // org lifecycle envelope is a payload-complete tenant snapshot —
+    // org lifecycle envelope is a payload-complete tenant snapshot -
     // consumers (vertical env-init, caches) act without a lookup.
     emit_sentin8_sys_event_tx(
         &mut tx,
@@ -822,7 +822,7 @@ pub async fn create_org(
     )
     .await;
 
-    // Resolve the caller's user id BEFORE provisioning — the provisioning
+    // Resolve the caller's user id BEFORE provisioning - the provisioning
     // path adds the creator to the org's owners GROUP (auth DESIGN §4.3a).
     let user_id = match Uuid::parse_str(&a.claims.sub) {
         Ok(u) => u,
@@ -838,10 +838,10 @@ pub async fn create_org(
     // lifecycle"): the record tx committed above; provisioning rides
     // auth's membership API (idempotent ON CONFLICT upserts) directly in
     // the handler. The compensation on failure deletes the just-created
-    // record (500) — a caller retry starts clean; nothing half-created
+    // record (500) - a caller retry starts clean; nothing half-created
     // survives. No workflow engine on the fundamental path.
     if let Err(e) = provision_org_access(&state.pool, org_id.id, user_id).await {
-        tracing::error!(org_id = %org_id.id, error = %e, "sys: create-org provisioning FAILED — compensating (org row deleted)");
+        tracing::error!(org_id = %org_id.id, error = %e, "sys: create-org provisioning FAILED - compensating (org row deleted)");
         let mut cx = state.pool.begin().await.map_err(err_db)?;
         set_rls_context(&mut cx, sentin8::config::SYSTEM_ENV_ID).await;
         let _ = sqlx::query("DELETE FROM organizations WHERE id = $1")
@@ -851,7 +851,7 @@ pub async fn create_org(
         let _ = cx.commit().await;
         return Err((
             StatusCode::INTERNAL_SERVER_ERROR,
-            format!("org provisioning failed: {e} — the org was not created; retry"),
+            format!("org provisioning failed: {e} - the org was not created; retry"),
         ));
     }
 
@@ -879,7 +879,7 @@ pub async fn create_org(
     }))
 }
 
-/// `GET /v1/o` — list organizations.
+/// `GET /v1/o` - list organizations.
 #[utoipa::path(
     get,
     operation_id = "org.list",
@@ -907,7 +907,7 @@ pub async fn list_orgs(
     let offset = q.offset.max(0);
 
     // (PG18 GUC rule): `sys.organizations` is FORCE-RLS'd on
-    // `sentin8_context_initialized` — both branches read inside a
+    // `sentin8_context_initialized` - both branches read inside a
     // transaction whose context covers the catalog view.
     let mut tx = state.pool.begin().await.map_err(err_db)?;
     set_rls_context(&mut tx, a.claims.env_uuid()).await;
@@ -924,7 +924,7 @@ pub async fn list_orgs(
         .await
     } else {
         let user_id = Uuid::parse_str(&a.claims.sub).unwrap_or(Uuid::nil());
- // : membership rides auth's owner API — the same
+ // : membership rides auth's owner API - the same
  // id-embedded group-name resolution as `bootstrap` ( names).
         let member_org_ids = member_org_ids_via_auth(user_id).await?;
         sqlx::query_as::<_, OrgRow>(
@@ -959,7 +959,7 @@ pub async fn list_orgs(
     ))
 }
 
-/// `GET /v1/org/{id}` — organization detail.
+/// `GET /v1/org/{id}` - organization detail.
 #[utoipa::path(
     get,
     operation_id = "org.get",
@@ -987,7 +987,7 @@ pub async fn get_org(
         sentin8::shield::EvalTarget::new("sentin8:sys:read"),
     )
     .await?;
-    // — the organizations table is FORCE-RLS'd; a bare-pool SELECT
+    // - the organizations table is FORCE-RLS'd; a bare-pool SELECT
     // silently returns 0 rows (: org GET returned 404
     // for an existing org once policy allowed the request). The caller's
     // token env is the tenant context; the policy's SYSTEM-env blanket
@@ -1015,7 +1015,7 @@ pub async fn get_org(
     }))
 }
 
-/// `PUT /v1/org/{id}` — update organization.
+/// `PUT /v1/org/{id}` - update organization.
 #[utoipa::path(
     put,
     operation_id = "org.update",
@@ -1086,7 +1086,7 @@ pub async fn update_org(
     )
     .await;
 
-    // Stories — emit sys.org.updated to system org/env, same tx.
+    // Stories - emit sys.org.updated to system org/env, same tx.
     set_rls_context(&mut tx, sentin8::config::SYSTEM_ENV_ID).await;
     // VDC-3: payload-complete org snapshot (see the org:created emit).
     emit_sentin8_sys_event_tx(
@@ -1115,7 +1115,7 @@ pub async fn update_org(
     }))
 }
 
-/// `POST /v1/org/{id}/archive` — archive organization.
+/// `POST /v1/org/{id}/archive` - archive organization.
 #[utoipa::path(
     post,
     operation_id = "org.archive",
@@ -1165,7 +1165,7 @@ pub async fn archive_org(
         None,
     )
     .await;
-    // Stories — emit sys.org.archived, same tx.
+    // Stories - emit sys.org.archived, same tx.
     set_rls_context(&mut tx, sentin8::config::SYSTEM_ENV_ID).await;
     emit_sentin8_sys_event_tx(
         &mut tx,
@@ -1179,7 +1179,7 @@ pub async fn archive_org(
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// `DELETE /v1/org/{id}` — cascade-delete org and all related records.
+/// `DELETE /v1/org/{id}` - cascade-delete org and all related records.
 #[utoipa::path(
     delete,
     path = "/v1/org/{id}",
@@ -1264,13 +1264,13 @@ pub async fn delete_org(
     .execute(&mut *tx)
     .await
     .map_err(err_db)?;
-    // Delete the org's groups at SYSTEM_ENV_ID ( — names embed the
+    // Delete the org's groups at SYSTEM_ENV_ID ( - names embed the
     // tenant UUID, so no user-influenced LIKE pattern is needed):
     // - org-realm groups: `sentin8:org:{org_id}:%` (prefix on the org's
-    // own UUID — owners/admins/viewers)
+    // own UUID - owners/admins/viewers)
     // - env-realm org-scoped groups: `sentin8:env:{env_id}:%` for every env
     // of this org (previously pattern-matched with the ORG slug, which
-    // orphaned rows for envs whose slug differed — defect 3).
+    // orphaned rows for envs whose slug differed - defect 3).
     let org_pattern = format!("sentin8:org:{id}:%");
     sqlx::query("DELETE FROM group_members WHERE group_id IN (SELECT id FROM groups WHERE env_id = $1 AND name LIKE $2)")
         .bind(sentin8::config::SYSTEM_ENV_ID).bind(&org_pattern).execute(&mut *tx).await.map_err(err_db)?;
@@ -1283,7 +1283,7 @@ pub async fn delete_org(
         .await
         .map_err(err_db)?;
     // Env-realm org-scoped groups (`sentin8:env:{env_id}:admins/viewers` at
-    // SYSTEM_ENV_ID) — one exact-pattern sweep per env id.
+    // SYSTEM_ENV_ID) - one exact-pattern sweep per env id.
     let env_ids: Vec<Uuid> = sqlx::query_scalar("SELECT id FROM environments WHERE org_id = $1")
         .bind(id)
         .fetch_all(&mut *tx)
@@ -1325,7 +1325,7 @@ pub async fn delete_org(
         None,
     )
     .await;
-    // Stories — emit sys.org.deleted, same tx.
+    // Stories - emit sys.org.deleted, same tx.
     set_rls_context(&mut tx, sentin8::config::SYSTEM_ENV_ID).await;
     emit_sentin8_sys_event_tx(
         &mut tx,
@@ -1393,7 +1393,7 @@ pub struct ListEnvsQuery {
     pub org_id: Option<Uuid>,
 }
 
-/// `POST /v1/e` — create environment.
+/// `POST /v1/e` - create environment.
 #[utoipa::path(
     post,
     operation_id = "env.create",
@@ -1453,7 +1453,7 @@ pub async fn create_env(
     };
     set_rls_context(&mut tx, sentin8::config::SYSTEM_ENV_ID).await;
     // VDC-3 (design/sentin8-vertical-data-plane-contract.md §VDC.4): the
-    // env lifecycle envelope is a payload-complete tenant snapshot —
+    // env lifecycle envelope is a payload-complete tenant snapshot -
     // org + env identity so consumers (fdx provider-profile derivation,
     // caches) act without a lookup.
     let org_snapshot: Option<(String, String, String)> =
@@ -1488,15 +1488,15 @@ pub async fn create_env(
         .await;
 
     // Synchronous access-model provisioning (sys DESIGN §2 "Org creation
-    // lifecycle" — env family): the record tx committed above; the
+    // lifecycle" - env family): the record tx committed above; the
     // provisioning helper seeds the env's policy template, provisions the
     // env realm + org-scoped access through auth's API (idempotent), and
     // commits the identity-invalidation event. A provisioning failure
-    // compensates by deleting the env record (500) — a caller retry
+    // compensates by deleting the env record (500) - a caller retry
     // starts clean. No workflow engine on the fundamental path.
     let user_id = Uuid::parse_str(&a.claims.sub).unwrap_or(Uuid::nil());
     if let Err(e) = provision_env_access(&state.pool, org_id, row.id, user_id).await {
-        tracing::error!(env_id = %row.id, error = %e, "sys: create-env provisioning FAILED — compensating (env row deleted)");
+        tracing::error!(env_id = %row.id, error = %e, "sys: create-env provisioning FAILED - compensating (env row deleted)");
         let mut cx = state.pool.begin().await.map_err(err_db)?;
         set_rls_context(&mut cx, sentin8::config::SYSTEM_ENV_ID).await;
         let _ = sqlx::query("DELETE FROM environments WHERE id = $1")
@@ -1506,7 +1506,7 @@ pub async fn create_env(
         let _ = cx.commit().await;
         return Err((
             StatusCode::INTERNAL_SERVER_ERROR,
-            format!("env provisioning failed: {e} — the env was not created; retry"),
+            format!("env provisioning failed: {e} - the env was not created; retry"),
         ));
     }
 
@@ -1533,7 +1533,7 @@ pub async fn create_env(
     }))
 }
 
-/// `GET /v1/e` — list environments.
+/// `GET /v1/e` - list environments.
 #[utoipa::path(
     get,
     operation_id = "env.list",
@@ -1591,7 +1591,7 @@ pub async fn list_envs(
         ));
     }
 
-    // No org_id filter — list all envs the caller has access to via RBAC.
+    // No org_id filter - list all envs the caller has access to via RBAC.
     // (PG18 GUC rule): both branches read inside a context transaction
     // (sys.environments is FORCE-RLS'd on sentin8_context_initialized).
     let mut tx = state.pool.begin().await.map_err(err_db)?;
@@ -1607,7 +1607,7 @@ pub async fn list_envs(
         .await
     } else {
         let user_id = Uuid::parse_str(&a.claims.sub).unwrap_or(Uuid::nil());
- // : env visibility follows org membership — the
+ // : env visibility follows org membership - the
  // user's member-org ids ride auth's owner API (same resolution as
  // `bootstrap`); their envs are the visible env list. Env-realm
  // role grants ( provisioning) always ride an org the user is
@@ -1645,7 +1645,7 @@ pub async fn list_envs(
     ))
 }
 
-/// `GET /v1/env/{env_id}` — environment detail.
+/// `GET /v1/env/{env_id}` - environment detail.
 #[utoipa::path(
     get,
     operation_id = "env.get",
@@ -1677,7 +1677,7 @@ pub async fn get_env(
     authorize_org(&a, org_id, &state.pool).await?;
 
     // (PG18 GUC rule): the row + services
-    // reads ride ONE context transaction keyed on the TARGET env —
+    // reads ride ONE context transaction keyed on the TARGET env -
     // sys_environments_select admits `id = app.env_id`, and a bare-pool read
     // (context evaporated with resolve_org_id's tx) sees zero rows → 404.
     let mut tx = state.pool.begin().await.map_err(err_db)?;
@@ -1724,7 +1724,7 @@ pub async fn get_env(
     }))
 }
 
-/// `PUT /v1/env/{env_id}` — update environment.
+/// `PUT /v1/env/{env_id}` - update environment.
 #[utoipa::path(
     put,
     operation_id = "env.update",
@@ -1799,7 +1799,7 @@ pub async fn update_env(
     )
     .await;
 
-    // Stories — emit sys.env.updated, same tx.
+    // Stories - emit sys.env.updated, same tx.
     set_rls_context(&mut tx, sentin8::config::SYSTEM_ENV_ID).await;
     // VDC-3: payload-complete env snapshot (see the env:created emit).
     let org_snapshot: Option<(String, String, String)> =
@@ -1863,7 +1863,7 @@ pub async fn update_env(
     }))
 }
 
-/// `POST /v1/env/{env_id}/archive` — archive environment.
+/// `POST /v1/env/{env_id}/archive` - archive environment.
 #[utoipa::path(
     post,
     operation_id = "env.archive",
@@ -1916,7 +1916,7 @@ pub async fn archive_env(
         None,
     )
     .await;
-    // Stories — emit sys.env.archived, same tx.
+    // Stories - emit sys.env.archived, same tx.
     emit_sentin8_sys_event_tx(
         &mut tx,
         env_id,
@@ -1929,7 +1929,7 @@ pub async fn archive_env(
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// `DELETE /v1/env/{env_id}` — cascade-delete environment.
+/// `DELETE /v1/env/{env_id}` - cascade-delete environment.
 #[utoipa::path(
     delete,
     path = "/v1/env/{env_id}",
@@ -2041,7 +2041,7 @@ pub async fn delete_env(
         None,
     )
     .await;
-    // Stories — emit sys.env.deleted, same tx.
+    // Stories - emit sys.env.deleted, same tx.
     emit_sentin8_sys_event_tx(
         &mut tx,
         env_id,
@@ -2081,7 +2081,7 @@ pub struct SetServiceRequest {
     pub config: serde_json::Value,
 }
 
-/// `GET /v1/env/{env_id}/services` — list service states.
+/// `GET /v1/env/{env_id}/services` - list service states.
 #[utoipa::path(
     get,
     operation_id = "service.list",
@@ -2111,7 +2111,7 @@ pub async fn list_services(
     let org_id = resolve_org_id(&state.pool, env_id).await?;
     authorize_org(&a, org_id, &state.pool).await?;
 
-    // (PG18 GUC rule): the services read rides a context transaction —
+    // (PG18 GUC rule): the services read rides a context transaction -
     // sys.services is FORCE-RLS'd on sentin8_context_initialized; a
     // bare-pool read (context evaporated with resolve_org_id's tx) sees zero
     // rows.
@@ -2140,7 +2140,7 @@ pub async fn list_services(
     ))
 }
 
-/// `PUT /v1/env/{env_id}/services` — enable/disable service.
+/// `PUT /v1/env/{env_id}/services` - enable/disable service.
 #[utoipa::path(
     put,
     operation_id = "service.disable",
@@ -2201,12 +2201,12 @@ pub async fn set_service(
     )
     .await;
 
-    // Stories — emit sys.service.updated to the system org/env stream,
+    // Stories - emit sys.service.updated to the system org/env stream,
     // same tx. Downstream services (e.g. bank8-ledger) consume this
     // event via Sentin8:Bus SSE on the system stream family `sys` and run
     // their env-init reaction asynchronously. The payload carries the target
     // env_id so the consumer knows which tenant to seed. sentin8-sys does
-    // NOT call the service's env-init endpoint directly — env-init is
+    // NOT call the service's env-init endpoint directly - env-init is
     // event-driven. The event row lives in the system env, and the
     // inbox INSERT policy requires row env_id = app.env_id, so re-set
     // the context to the system env for this emit (it is the last write
@@ -2268,7 +2268,7 @@ pub struct ApplicationResponse {
     pub status: String,
 }
 
-/// `POST /v1/env/{env_id}/applications` — create application.
+/// `POST /v1/env/{env_id}/applications` - create application.
 #[utoipa::path(
     post,
     operation_id = "app.create",
@@ -2343,7 +2343,7 @@ pub async fn create_application(
         Some(serde_json::json!({ "name": req.name })),
     )
     .await;
-    // Stories — emit sys.app.created, same tx.
+    // Stories - emit sys.app.created, same tx.
     emit_sentin8_sys_event_tx(
         &mut tx,
         env_id,
@@ -2363,7 +2363,7 @@ pub async fn create_application(
     }))
 }
 
-/// `GET /v1/env/{env_id}/applications` — list applications.
+/// `GET /v1/env/{env_id}/applications` - list applications.
 #[utoipa::path(
     get,
     operation_id = "app.list",
@@ -2417,7 +2417,7 @@ pub async fn list_applications(
     ))
 }
 
-/// `GET /v1/env/{env_id}/applications/{app_id}` — application detail.
+/// `GET /v1/env/{env_id}/applications/{app_id}` - application detail.
 #[utoipa::path(
     get,
     operation_id = "app.get",
@@ -2469,7 +2469,7 @@ pub async fn get_application(
     }))
 }
 
-/// `PUT /v1/env/{env_id}/applications/{app_id}` — update application.
+/// `PUT /v1/env/{env_id}/applications/{app_id}` - update application.
 #[utoipa::path(
     put,
     operation_id = "app.update",
@@ -2534,7 +2534,7 @@ pub async fn update_application(
         None,
     )
     .await;
-    // Stories — emit sys.app.updated, same tx.
+    // Stories - emit sys.app.updated, same tx.
     emit_sentin8_sys_event_tx(
         &mut tx,
         env_id,
@@ -2554,7 +2554,7 @@ pub async fn update_application(
     }))
 }
 
-/// `POST /v1/env/{env_id}/applications/{app_id}/archive` — archive application.
+/// `POST /v1/env/{env_id}/applications/{app_id}/archive` - archive application.
 #[utoipa::path(
     post,
     operation_id = "app.archive",
@@ -2608,7 +2608,7 @@ pub async fn archive_application(
         None,
     )
     .await;
-    // Stories — emit sys.app.archived, same tx.
+    // Stories - emit sys.app.archived, same tx.
     emit_sentin8_sys_event_tx(
         &mut tx,
         env_id,
@@ -2655,7 +2655,7 @@ pub struct BindingResponse {
     pub status: String,
 }
 
-/// `POST /v1/env/{env_id}/bindings` — create app-environment binding.
+/// `POST /v1/env/{env_id}/bindings` - create app-environment binding.
 #[utoipa::path(
     post,
     operation_id = "binding.create",
@@ -2724,7 +2724,7 @@ pub async fn create_binding(
         None,
     )
     .await;
-    // Stories — emit sys.binding.created, same tx.
+    // Stories - emit sys.binding.created, same tx.
     emit_sentin8_sys_event_tx(
         &mut tx,
         env_id,
@@ -2745,7 +2745,7 @@ pub async fn create_binding(
     }))
 }
 
-/// `GET /v1/env/{env_id}/bindings` — list bindings.
+/// `GET /v1/env/{env_id}/bindings` - list bindings.
 #[utoipa::path(
     get,
     operation_id = "binding.list",
@@ -2800,7 +2800,7 @@ pub async fn list_bindings(
     ))
 }
 
-/// `DELETE /v1/env/{env_id}/bindings/{binding_id}` — remove binding.
+/// `DELETE /v1/env/{env_id}/bindings/{binding_id}` - remove binding.
 #[utoipa::path(
     delete,
     operation_id = "binding.delete",
@@ -2852,7 +2852,7 @@ pub async fn delete_binding(
         None,
     )
     .await;
-    // Stories — emit sys.binding.deleted, same tx.
+    // Stories - emit sys.binding.deleted, same tx.
     emit_sentin8_sys_event_tx(
         &mut tx,
         env_id,
@@ -2915,7 +2915,7 @@ pub struct InvitationResponse {
     pub expires_at: chrono::DateTime<chrono::Utc>,
 }
 
-/// `GET /v1/org/{org_id}/memberships` — list members.
+/// `GET /v1/org/{org_id}/memberships` - list members.
 #[utoipa::path(
     get,
     operation_id = "membership.list",
@@ -2959,7 +2959,7 @@ pub async fn list_memberships(
                JOIN groups g ON g.id = gm.group_id
                WHERE gm.user_id = u.id AND g.env_id IN (SELECT id FROM environments WHERE org_id = $1)
                UNION
-               -- Per-org groups at SYSTEM_ENV_ID ( — names embed the org UUID)
+               -- Per-org groups at SYSTEM_ENV_ID ( - names embed the org UUID)
                SELECT 1 FROM group_members gm
                JOIN groups g ON g.id = gm.group_id
                WHERE gm.user_id = u.id AND g.env_id = $2
@@ -2980,13 +2980,13 @@ pub async fn list_memberships(
                 user_id: r.get("user_id"),
                 org_id,
                 role: "member".into(), // role details are in RBAC, not a flat table
-                created_at: chrono::Utc::now(), // approximate — RBAC doesn't track join time here
+                created_at: chrono::Utc::now(), // approximate - RBAC doesn't track join time here
             })
             .collect(),
     ))
 }
 
-/// `DELETE /v1/org/{org_id}/memberships` — remove member.
+/// `DELETE /v1/org/{org_id}/memberships` - remove member.
 #[utoipa::path(
     delete,
     operation_id = "membership.remove",
@@ -3052,7 +3052,7 @@ pub async fn remove_membership(
     .await
     .map_err(err_db)?;
 
-    // Also remove per-org group memberships at SYSTEM_ENV_ID ( — names
+    // Also remove per-org group memberships at SYSTEM_ENV_ID ( - names
     // embed the org UUID, prefix matches this org's own id only).
     let _ = sqlx::query(
         r#"DELETE FROM group_members
@@ -3080,7 +3080,7 @@ pub async fn remove_membership(
         None,
     )
     .await;
-    // Stories — emit sys.membership.removed, same tx.
+    // Stories - emit sys.membership.removed, same tx.
     set_rls_context(&mut tx, sentin8::config::SYSTEM_ENV_ID).await;
     emit_sentin8_sys_event_tx(
         &mut tx,
@@ -3093,7 +3093,7 @@ pub async fn remove_membership(
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// `GET /v1/org/{org_id}/invitations` — list invitations (: the
+/// `GET /v1/org/{org_id}/invitations` - list invitations (: the
 /// lifecycle owner's read surface; auth's admin UI proxies here).
 #[utoipa::path(
     get,
@@ -3123,7 +3123,7 @@ pub async fn list_invitations(
     .await?;
     authorize_org(&a, org_id, &state.pool).await?;
 
-    // RLS context is transaction-local (set_config(..., true)) — it must
+    // RLS context is transaction-local (set_config(..., true)) - it must
     // be set inside an explicit transaction; on an autocommit connection
     // it evaporates before the query runs.
     let mut conn = state.pool.begin().await.map_err(err_db)?;
@@ -3153,7 +3153,7 @@ pub async fn list_invitations(
     ))
 }
 
-/// `POST /v1/invitations/{id}/revoke` — revoke an invitation (:
+/// `POST /v1/invitations/{id}/revoke` - revoke an invitation (:
 /// lifecycle owner surface; auth's admin UI proxies here).
 #[utoipa::path(
     post,
@@ -3219,7 +3219,7 @@ pub async fn revoke_invitation(
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// `POST /v1/org/{org_id}/invitations` — send invitation.
+/// `POST /v1/org/{org_id}/invitations` - send invitation.
 #[utoipa::path(
     post,
     operation_id = "invitation.send",
@@ -3282,7 +3282,7 @@ pub async fn send_invitation(
     // DBX (SYS-3, sys DESIGN §10): emit sys.invitation.sent + enqueue the
     // post-mail notification row in the SAME domain transaction. The
     // post_outbox row carries the ORG's env under the caller's (already
-    // set) context — same-context INSERT passes RLS; the sys-post pusher
+    // set) context - same-context INSERT passes RLS; the sys-post pusher
     // relays it to Post POST /v1/send afterwards.
     set_rls_context(&mut tx, sentin8::config::SYSTEM_ENV_ID).await;
     emit_sentin8_sys_event_tx(
@@ -3316,7 +3316,7 @@ pub async fn send_invitation(
     }))
 }
 
-/// `POST /v1/org/{org_id}/invitations/{invitation_id}/accept` — accept invitation.
+/// `POST /v1/org/{org_id}/invitations/{invitation_id}/accept` - accept invitation.
 #[utoipa::path(
     post,
     operation_id = "invitation.accept",
@@ -3375,7 +3375,7 @@ pub async fn accept_invitation(
     }
 
     // Verify the accepting user's email matches the invitation's email.
-    // The email match is the invitation's proof-of-possession — when the
+    // The email match is the invitation's proof-of-possession - when the
     // token carries no email claim the check cannot pass, so reject.
     let invited_email: String = row.get("email");
     let user_email = a.claims.email.as_deref().unwrap_or("");
@@ -3386,7 +3386,7 @@ pub async fn accept_invitation(
         ));
     }
 
-    // sys_organizations_select admits `id = sentin8_current_org_id` — the
+    // sys_organizations_select admits `id = sentin8_current_org_id` - the
     // org-slug lookup is platform-level data resolution, so re-set the
     // context to the system env for this read (same tx, still same-connection).
     set_rls_context(&mut tx, sentin8::config::SYSTEM_ENV_ID).await;
@@ -3400,13 +3400,13 @@ pub async fn accept_invitation(
 
     // Add the user to the per-org admins group at SYSTEM_ENV_ID. That group
     // carries the org-scoped sentin8:org:admin role for THIS org only. Never insert
-    // into a shared role row at SYSTEM_ENV_ID — those rows are reused across
+    // into a shared role row at SYSTEM_ENV_ID - those rows are reused across
     // orgs, so a direct assignment would grant visibility into every org.
     // The membership row lives in the system env, so the context must be the
     // system env for this write (RLS env match). The group is created by the
-    // create-org Flow saga — acceptance does not create the access model; a
+    // create-org Flow saga - acceptance does not create the access model; a
     // missing group fails the write. The group name
-    // embeds the org UUID — the handler already holds org_id, so no
+    // embeds the org UUID - the handler already holds org_id, so no
     // slug round-trip is needed.
     set_rls_context(&mut tx, sentin8::config::SYSTEM_ENV_ID).await;
     // : the membership write rides AUTH's provisioning API (the
@@ -3428,7 +3428,7 @@ pub async fn accept_invitation(
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     if written == 0 {
-        // The INSERT … SELECT matched no group row — acceptance must not
+        // The INSERT … SELECT matched no group row - acceptance must not
         // report success without granting access.
         return Err((
             StatusCode::CONFLICT,
@@ -3449,7 +3449,7 @@ pub async fn accept_invitation(
     // DBX (SYS-3, sys DESIGN §10): emit sys.invitation.accepted + enqueue
     // the accepted-notification row in the SAME domain transaction. The
     // post_outbox row carries the ORG's env under the caller's (already
-    // set) context — same-context INSERT passes RLS; the sys-post pusher
+    // set) context - same-context INSERT passes RLS; the sys-post pusher
     // relays it to Post POST /v1/send afterwards.
     set_rls_context(&mut tx, sentin8::config::SYSTEM_ENV_ID).await;
     emit_sentin8_sys_event_tx(
@@ -3472,7 +3472,7 @@ pub async fn accept_invitation(
     .await;
     tx.commit().await.map_err(err_db)?;
     // Read-your-writes (sys DESIGN §2, backlog RYW-1): acceptance just
-    // granted org-scoped membership in the SYSTEM env realm — sweep
+    // granted org-scoped membership in the SYSTEM env realm - sweep
     // THIS process's resolver so the member's next request (same
     // process) sees the grant without waiting for the async bus event.
     crate::policy::invalidate_local_identity_caches([sentin8::config::SYSTEM_ENV_ID]);
@@ -3537,7 +3537,7 @@ fn row_to_branding(row: &sqlx::postgres::PgRow) -> BrandingResponse {
     }
 }
 
-/// `GET /v1/org/{org_id}/branding` — get org-level branding.
+/// `GET /v1/org/{org_id}/branding` - get org-level branding.
 #[utoipa::path(
     get,
     operation_id = "branding.get",
@@ -3587,7 +3587,7 @@ pub async fn get_org_branding(
     )))
 }
 
-/// `PUT /v1/org/{org_id}/branding` — set org-level branding.
+/// `PUT /v1/org/{org_id}/branding` - set org-level branding.
 #[utoipa::path(
     put,
     operation_id = "branding.set",
@@ -3611,7 +3611,7 @@ pub async fn set_org_branding(
     let a = auth::verify(&state.workload_registry, &state.config, &headers).await?;
     // Incident (policy design ): this was gated with the
     // coarse `sentin8:sys:write` action, which NO scope-mirror set permits
-    // (not a registered scope, not a mirrored action) — the endpoint denied
+    // (not a registered scope, not a mirrored action) - the endpoint denied
     // for every principal. Use the mirrored granular action; the org-admin
     // entitlement rides authorize_org below.
     crate::policy::require_policy(
@@ -3639,7 +3639,7 @@ pub async fn set_org_branding(
     .bind(&req.font_family).bind(req.theme_mode.as_deref().unwrap_or("")).bind(&req.custom_css).bind(&req.sign_in_text)
     .fetch_one(&mut *tx).await.map_err(err_db)?;
     audit_tx(&mut tx, &a, "update", "branding", "org", None, None).await;
-    // Stories — emit sys.branding.org.updated, same tx.
+    // Stories - emit sys.branding.org.updated, same tx.
     set_rls_context(&mut tx, sentin8::config::SYSTEM_ENV_ID).await;
     emit_sentin8_sys_event_tx(
         &mut tx,
@@ -3653,7 +3653,7 @@ pub async fn set_org_branding(
     Ok(Json(row_to_branding(&row)))
 }
 
-/// `GET /v1/env/{env_id}/branding` — get env-level branding.
+/// `GET /v1/env/{env_id}/branding` - get env-level branding.
 #[utoipa::path(
     get,
     operation_id = "branding.get-env",
@@ -3702,7 +3702,7 @@ pub async fn get_env_branding(
     )))
 }
 
-/// `PUT /v1/env/{env_id}/branding` — set env-level branding.
+/// `PUT /v1/env/{env_id}/branding` - set env-level branding.
 #[utoipa::path(
     put,
     operation_id = "branding.set-env",
@@ -3724,7 +3724,7 @@ pub async fn set_env_branding(
     Json(req): Json<SetBrandingRequest>,
 ) -> Result<Json<BrandingResponse>, (StatusCode, String)> {
     let a = auth::verify(&state.workload_registry, &state.config, &headers).await?;
-    // Incident (policy design ): was `sentin8:sys:write` —
+    // Incident (policy design ): was `sentin8:sys:write` -
     // an action no set mirrors; see the org-branding note above.
     crate::policy::require_policy(
         &state.policy,
@@ -3752,7 +3752,7 @@ pub async fn set_env_branding(
     .bind(&req.font_family).bind(req.theme_mode.as_deref().unwrap_or("")).bind(&req.custom_css).bind(&req.sign_in_text)
     .fetch_one(&mut *tx).await.map_err(err_db)?;
     audit_tx(&mut tx, &a, "update", "branding", "env", None, None).await;
-    // Stories — emit sys.branding.env.updated, same tx.
+    // Stories - emit sys.branding.env.updated, same tx.
     emit_sentin8_sys_event_tx(
         &mut tx,
         env_id,
@@ -3765,7 +3765,7 @@ pub async fn set_env_branding(
     Ok(Json(row_to_branding(&row)))
 }
 
-/// `GET /v1/env/{env_id}/branding/merged` — merged org+env branding.
+/// `GET /v1/env/{env_id}/branding/merged` - merged org+env branding.
 #[utoipa::path(
     get,
     operation_id = "branding.merged",
@@ -3848,7 +3848,7 @@ pub struct BootstrapResponse {
 
 // ── Tenant resolution endpoints ──────────────────────────
 
-/// `GET /v1/env/{env_id}/auth-domain` — returns the env's full auth_domain URL.
+/// `GET /v1/env/{env_id}/auth-domain` - returns the env's full auth_domain URL.
 #[utoipa::path(
     get,
     path = "/v1/env/{env_id}/auth-domain",
@@ -3865,7 +3865,7 @@ pub async fn get_env_auth_domain(
     headers: HeaderMap,
     Path(env_id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
-    // BFF-only surface — zero-trust (sys design ). Step 5 decides:
+    // BFF-only surface - zero-trust (sys design ). Step 5 decides:
     // the enforced scope-mirror permits `sentin8:sys:instances:read` (the
     // BFF delegator's M2M scope) and any broader sys admin scope.
     let _a = auth::verify(&state.workload_registry, &state.config, &headers).await?;
@@ -3877,14 +3877,14 @@ pub async fn get_env_auth_domain(
     )
     .await?;
     // Resolve org_id from env_id to validate the env exists (env_id is
-    // globally unique and sufficient — the query below uses only env_id).
+    // globally unique and sufficient - the query below uses only env_id).
     let _org_id = resolve_org_id(&state.pool, env_id).await?;
 
-    // Set RLS context to the requested env — this endpoint resolves the
+    // Set RLS context to the requested env - this endpoint resolves the
     // auth domain for a specific org/env, so it needs that tenant's context.
     // Same-connection/transaction rule (sys design , rule 2):
     // `sentin8_set_tenant_context` is transaction-local (`set_config(...,
-    // true)`) — on an autocommit connection the context evaporates between
+    // true)`) - on an autocommit connection the context evaporates between
     // statements and RLS hides the row (: the endpoint
     // 200'd with `auth_domain: ""` and every BFF `/auth/login` 502'd).
     // Context + query share ONE explicit transaction.
@@ -3912,13 +3912,13 @@ pub async fn get_env_auth_domain(
             let cfg = sentin8::config::Sentin8Config::from_env();
             let env_domain = cfg.env_domain(&env_slug, &org_domain);
             if subdomain.is_empty() {
-                // No custom auth subdomain set — return the default env-scoped
+                // No custom auth subdomain set - return the default env-scoped
                 // auth domain (`auth.{env_domain}`) so callers (BFF) redirect
                 // to the tenant's own auth instance instead of falling back to
                 // the platform `auth.{sentin8_domain}`.
                 format!("https://{}", cfg.env_auth_domain(&env_domain))
             } else {
-                // Custom auth subdomain — construct the URL with it.
+                // Custom auth subdomain - construct the URL with it.
                 format!("https://{}.{}", subdomain, env_domain)
             }
         }
@@ -3938,7 +3938,7 @@ pub struct InstanceScopesQuery {
     pub hostname: String,
 }
 
-/// `GET /v1/app-instance/scopes` — resolve an app instance's OAuth scopes.
+/// `GET /v1/app-instance/scopes` - resolve an app instance's OAuth scopes.
 #[utoipa::path(
     get,
     path = "/v1/app-instance/scopes",
@@ -3955,7 +3955,7 @@ pub async fn get_instance_scopes(
     headers: HeaderMap,
     Query(q): Query<InstanceScopesQuery>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
-    // BFF-only surface — zero-trust (sys design ). Step 5 decides:
+    // BFF-only surface - zero-trust (sys design ). Step 5 decides:
     // the enforced scope-mirror permits `sentin8:sys:instances:read` (the
     // BFF delegator's M2M scope) and any broader sys admin scope.
     let _a = auth::verify(&state.workload_registry, &state.config, &headers).await?;
@@ -3977,7 +3977,7 @@ pub async fn get_instance_scopes(
         .strip_prefix("bff.")
         .map(|s| s.to_string())
         .unwrap_or_else(|| host.clone());
-    // Set system org context — these lookups query across all tenants by
+    // Set system org context - these lookups query across all tenants by
     // hostname. The context is transaction-local, so hold it inside an
     // explicit transaction (autocommit evaporates it before the query).
     let mut conn = state.pool.begin().await.map_err(err_db)?;
@@ -4016,19 +4016,19 @@ pub async fn get_instance_scopes(
     }
 }
 
-/// `GET /v1/tenants/{env_id}` — VDC-4 tenant-snapshot API
+/// `GET /v1/tenants/{env_id}` - VDC-4 tenant-snapshot API
 /// (design/sentin8-vertical-data-plane-contract.md §VDC.5).
 ///
 /// The sanctioned on-demand read for a vertical service to obtain tenant
-/// identity (env/org slugs, domains, auth domain) — the data fdx-style
+/// identity (env/org slugs, domains, auth domain) - the data fdx-style
 /// consumers need to derive issuer/JWKS/callback hostnames, and the initial
 /// snapshot for a vertical that boots after lifecycle events were emitted.
 ///
 /// Authorization (three gates, all fail-closed):
-/// 1. Bearer verify + M2M-only (`token_tp == "m2m"`) — user/delegated
+/// 1. Bearer verify + M2M-only (`token_tp == "m2m"`) - user/delegated
 ///    tokens use the user-surface org/env APIs instead.
 /// 2. Shield gate on `sentin8:sys:tenants:read` (grantable to workloads
-///    only via `m2m_grants` — the scope lives in
+///    only via `m2m_grants` - the scope lives in
 ///    `PLATFORM_SCOPE_VOCABULARY`, never in user role seeds).
 /// 3. **Scoped discovery**: the caller's service identity is derived from
 ///    the verified `client_id` → `sys.vertical_services` registry mapping;
@@ -4036,7 +4036,7 @@ pub async fn get_instance_scopes(
 ///    enabled (404 otherwise). A vertical can never enumerate tenants that
 ///    have not turned it on.
 ///
-/// DBX: the caller never touches `sys.*` tables — this is the owner API.
+/// DBX: the caller never touches `sys.*` tables - this is the owner API.
 #[utoipa::path(
     get,
     operation_id = "tenants.snapshot",
@@ -4075,13 +4075,13 @@ pub async fn get_tenant_snapshot(
     // One transaction: SYSTEM context + every lookup (the caller's own
     // enablement row and the env/org snapshot). The context is
     // transaction-local (`set_config(…, true)`), so ALL queries ride this
-    // connection — an autocommit lookup before the tx would see zero rows
+    // connection - an autocommit lookup before the tx would see zero rows
     // under FORCE RLS (sys.environments is tenant-gated).
     let mut tx = state.pool.begin().await.map_err(err_db)?;
     set_rls_context(&mut tx, sentin8::config::SYSTEM_ENV_ID).await;
 
     // Scoped discovery (VDC-4): the caller's service identity comes from the
-    // verified M2M token's `service_type` claim — stamped by Auth from the
+    // verified M2M token's `service_type` claim - stamped by Auth from the
     // enroll row (workload names are inconsistent, so the registry is the
     // source of truth). Sys NEVER reads auth tables for this (sys holds no
     // auth-schema grants by rule; the former oauth_clients join 500'd).
@@ -4100,18 +4100,18 @@ pub async fn get_tenant_snapshot(
     // Scoped discovery gate: only envs where the caller's own service is
     // enabled answer; everything else is an indistinguishable 404 (no
     // tenant-existence oracle for foreign verticals). The services table
-    // stores the SHORT leaf name (`ledger`, `fdx`) — strip the caller's
+    // stores the SHORT leaf name (`ledger`, `fdx`) - strip the caller's
     // colon identity (`bank8:ledger` → `ledger`); a full-identity match
     // never hits and every snapshot 404s.
     // The caller's OWN token env answers unconditionally: a service may
     // always read its own env's snapshot (the vertical org-membership
-    // checks resolve BOTH the caller's and the requested env's org —
+    // checks resolve BOTH the caller's and the requested env's org -
     // staff-auth envs carry no service-enablement rows by design, and a
     // 404 on the caller's own env would fail-close every legitimate
     // org check).
     // The caller's OWN token env answers unconditionally: a service may
     // always read its own env's snapshot (the vertical org-membership
-    // checks resolve BOTH the caller's and the requested env's org —
+    // checks resolve BOTH the caller's and the requested env's org -
     // staff-auth envs carry no service-enablement rows by design, and a
     // 404 on the caller's own env would fail-close every legitimate
     // org check). The same-transaction SYSTEM-context lookup below.
@@ -4165,7 +4165,7 @@ pub async fn get_tenant_snapshot(
     }
     let caller_leaf = caller_service.rsplit(':').next().unwrap_or(&caller_service);
     // Enablement gate: the caller's service must be enabled SOMEWHERE in
-    // the requested env's org (not necessarily in the requested env —
+    // the requested env's org (not necessarily in the requested env -
     // staff-auth envs carry no enablement rows by design, and the vertical
     // org-membership checks resolve envs across the org). Cross-vertical
     // probing stays impossible: a foreign vertical's service is never
@@ -4242,7 +4242,7 @@ pub async fn get_tenant_snapshot(
     })))
 }
 
-/// `GET /v1/resolve/hostname` — : the single cache-miss path for
+/// `GET /v1/resolve/hostname` - : the single cache-miss path for
 /// every service's embedded sentin8-tls DomainResolver. Returns the
 /// hostname → (service, org_id, env_id, app_id) mapping so no service
 /// needs SELECT grants on sys's domain tables. M2M `sentin8:sys:instances:read`,
@@ -4284,7 +4284,7 @@ pub async fn resolve_hostname(
         ));
     }
 
-    // Set system org context — cross-tenant hostname lookups. The context
+    // Set system org context - cross-tenant hostname lookups. The context
     // is transaction-local: begin an explicit transaction or it evaporates
     // before the queries run.
     let mut conn = state.pool.begin().await.map_err(err_db)?;
@@ -4377,7 +4377,7 @@ pub async fn resolve_hostname(
             .map_err(err_db)?
         };
         // Resolve the service_type from the hostname label via the runtime
-        // subdomain registry (sentin8-config — single source of truth).
+        // subdomain registry (sentin8-config - single source of truth).
         let subdomain_map = sentin8::config::Sentin8Config::from_env()
             .load_subdomain_map(&state.pool)
             .await;
@@ -4424,7 +4424,7 @@ fn service_label_key<'a>(labels: &[&'a str], suffix_len: usize) -> &'a str {
     }
 }
 
-/// `GET /v1/app-instance/auth-mode` — returns the app instance's auth_domain and allow_signup.
+/// `GET /v1/app-instance/auth-mode` - returns the app instance's auth_domain and allow_signup.
 #[utoipa::path(
     get,
     path = "/v1/app-instance/auth-mode",
@@ -4441,7 +4441,7 @@ pub async fn get_instance_auth_mode(
     headers: HeaderMap,
     Query(q): Query<InstanceAuthModeQuery>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
-    // BFF-only surface — zero-trust (sys design ). Step 5 decides:
+    // BFF-only surface - zero-trust (sys design ). Step 5 decides:
     // the enforced scope-mirror permits `sentin8:sys:instances:read` (the
     // BFF delegator's M2M scope) and any broader sys admin scope.
     let _a = auth::verify(&state.workload_registry, &state.config, &headers).await?;
@@ -4464,7 +4464,7 @@ pub async fn get_instance_auth_mode(
         .strip_prefix("bff.")
         .map(|s| s.to_string())
         .unwrap_or_else(|| host.clone());
-    // Set system org context — these lookups query across all tenants by
+    // Set system org context - these lookups query across all tenants by
     // hostname. The context is transaction-local, so hold it inside an
     // explicit transaction (autocommit evaporates it before the query).
     let mut conn = state.pool.begin().await.map_err(err_db)?;
@@ -4504,7 +4504,7 @@ pub async fn get_instance_auth_mode(
     };
     match row {
         Some(r) => Ok(Json(serde_json::json!({
-        // Stories — full instance identity so the BFF can bind
+        // Stories - full instance identity so the BFF can bind
         // sessions to the creating app (application_id), run the
         // auth-env match (token env vs instance env), and enforce the
         // sentin8:app:{instance_id} group gate at callback
@@ -4523,7 +4523,7 @@ pub async fn get_instance_auth_mode(
         // the column.
                    "group_gate": r.try_get::<Option<String>, _>("group_gate").ok().flatten().filter(|g| !g.is_empty()).unwrap_or_else(|| "strict".to_string()),
                    "oauth_client_id": r.try_get::<Option<String>, _>("oauth_client_id").ok().flatten().unwrap_or_default(),
-                   // Staff-mode CIBA client — the app-instance client registered
+                   // Staff-mode CIBA client - the app-instance client registered
                    // at the CUSTOMER env's auth (empty when the instance is not
                    // staff-mode; ciba.rs falls back to oauth_client_id).
                    "ciba_oauth_client_id": r.try_get::<Option<String>, _>("ciba_oauth_client_id").ok().flatten().unwrap_or_default(),
@@ -4555,7 +4555,7 @@ pub struct InstanceAuthModeQuery {
     pub app_id: Option<String>,
 }
 
-/// `GET /v1/env/{env_id}/app-custom-domain` — returns the custom domain for the app instance.
+/// `GET /v1/env/{env_id}/app-custom-domain` - returns the custom domain for the app instance.
 #[utoipa::path(
     get,
     path = "/v1/env/{env_id}/app-custom-domain",
@@ -4572,7 +4572,7 @@ pub async fn get_app_custom_domain(
     headers: HeaderMap,
     Path(env_id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
-    // BFF-only surface — zero-trust (sys design ). Step 5 decides:
+    // BFF-only surface - zero-trust (sys design ). Step 5 decides:
     // the enforced scope-mirror permits `sentin8:sys:instances:read` (the
     // BFF delegator's M2M scope) and any broader sys admin scope.
     let _a = auth::verify(&state.workload_registry, &state.config, &headers).await?;
@@ -4587,7 +4587,7 @@ pub async fn get_app_custom_domain(
     let org_id = resolve_org_id(&state.pool, env_id).await?;
     // Same-connection/transaction rule (sys design , rule 2):
     // context + query share ONE explicit transaction (transaction-local
-    // `set_config` evaporates on autocommit — RLS then hides the row).
+    // `set_config` evaporates on autocommit - RLS then hides the row).
     let mut tx = state.pool.begin().await.map_err(err_db)?;
     set_rls_context(&mut tx, env_id).await;
     let subdomain: String = sqlx::query_scalar(
@@ -4605,7 +4605,7 @@ pub async fn get_app_custom_domain(
     Ok(Json(serde_json::json!({ "custom_domain": subdomain })))
 }
 
-/// `GET /v1/bootstrap` — user orgs and default org.
+/// `GET /v1/bootstrap` - user orgs and default org.
 #[utoipa::path(
     get,
     operation_id = "bootstrap.get",
@@ -4623,7 +4623,7 @@ pub async fn bootstrap(
     headers: HeaderMap,
 ) -> Result<Json<BootstrapResponse>, (StatusCode, String)> {
     let a = auth::verify(&state.workload_registry, &state.config, &headers).await?;
-    // Incident (policy design ): bootstrap is a GET read —
+    // Incident (policy design ): bootstrap is a GET read -
     // it was gated with the coarse `sentin8:sys:write` action, which NO
     // scope-mirror set permits → the dash bootstrap (and every e2e run)
     // denied 403 for every principal. `sys:read` IS mirrored (granted for
@@ -4638,16 +4638,16 @@ pub async fn bootstrap(
     let user_id = Uuid::parse_str(&a.claims.sub).unwrap_or(Uuid::nil());
 
     // (): the
-    // membership query joined auth.user_roles/group_members directly — a
+    // membership query joined auth.user_roles/group_members directly - a
     // cross-service table read that PostgreSQL rejects under
     // `sentin8_sys_service`'s own-schema-only grants (`relation "user_roles"
     // does not exist` → 500). It had never executed in practice because
     // earlier defects denied at policy BEFORE the SQL ran. Resolution now
     // rides auth's owner API (same pattern as `authorize_org`):
     // the user's group names at SYSTEM_ENV_ID, where per-org groups embed
-    // the org UUID ( — `sentin8:org:{org_id}:owners/admins/viewers`),
+    // the org UUID ( - `sentin8:org:{org_id}:owners/admins/viewers`),
     // so an org id match proves membership. Env-level roles/groups (the
-    // env-realm provisioning) grant env-scoped org access too — the
+    // env-realm provisioning) grant env-scoped org access too - the
     // live role closure carries nothing org-embeddable, but the group
     // listing covers the org-realm groups; env-realm memberships surface
     // through the same listing because list_user_groups resolves the
@@ -4655,7 +4655,7 @@ pub async fn bootstrap(
     // env they hold roles in.
     let exclude_system_org = !a.is_platform_admin();
     let member_org_ids: std::collections::HashSet<Uuid> = if a.is_platform_admin() {
-        // Platform admins see every org — no membership filter.
+        // Platform admins see every org - no membership filter.
         std::collections::HashSet::new()
     } else {
         member_org_ids_via_auth(user_id)
@@ -4664,7 +4664,7 @@ pub async fn bootstrap(
             .collect()
     };
     // (PG18 GUC rule): `sys.organizations`
-    // is FORCE-RLS'd on `sentin8_context_initialized` — a bare-pool read
+    // is FORCE-RLS'd on `sentin8_context_initialized` - a bare-pool read
     // without tenant context sees ZERO rows (empty memberships) even though
     // the caller holds real memberships. The catalog read rides a
     // transaction whose context covers the whole catalog view: the caller's
@@ -4762,7 +4762,7 @@ pub struct AuditEventResponse {
     pub org_id: Option<Uuid>,
     /// env identifier.
     pub env_id: Option<Uuid>,
-    /// Emitting service (DBX — stamped by Sys from the verified M2M client_id).
+    /// Emitting service (DBX - stamped by Sys from the verified M2M client_id).
     /// The service.
     pub service: String,
     /// actor user identifier.
@@ -4791,22 +4791,22 @@ pub struct AuditQuery {
     /// Filter by emitting service (DBX ).
     /// The service.
     pub service: Option<String>,
-    /// Filter by org (accepted but not yet used for filtering — env_id is the primary filter).
+    /// Filter by org (accepted but not yet used for filtering - env_id is the primary filter).
     #[allow(dead_code)]
     /// org identifier.
     pub org_id: Option<Uuid>,
     /// env identifier.
     pub env_id: Option<Uuid>,
     /// Keyset cursor (SYS-2, sys DESIGN §10): return rows strictly older
-    /// than this timestamp. Takes precedence over `offset` — stable under
+    /// than this timestamp. Takes precedence over `offset` - stable under
     /// inserts between pages (the `(env_id, timestamp DESC)` index serves it).
     pub after_ts: Option<chrono::DateTime<chrono::Utc>>,
-    /// Tiebreaker for rows sharing `after_ts` (the row id) — pairs with
+    /// Tiebreaker for rows sharing `after_ts` (the row id) - pairs with
     /// `after_ts` for a deterministic keyset position.
     pub after_id: Option<Uuid>,
 }
 
-/// `GET /v1/audit` — query orchestration audit events.
+/// `GET /v1/audit` - query orchestration audit events.
 #[utoipa::path(
     get,
     operation_id = "audit.list",
@@ -4853,7 +4853,7 @@ pub async fn list_audit(
     };
 
     // Keyset mode (SYS-2, sys DESIGN §10): (after_ts, after_id) takes
-    // precedence over offset — stable pagination on (timestamp, id).
+    // precedence over offset - stable pagination on (timestamp, id).
     let (keyset, after_ts, after_id) = (
         q.after_ts.is_some() || q.after_id.is_some(),
         q.after_ts,
@@ -4902,7 +4902,7 @@ pub async fn list_audit(
 
 // ── Canonical audit ingest (DBX , sys design ) ───────────────
 
-/// One audit event in an ingest batch. `service` is IGNORED server-side —
+/// One audit event in an ingest batch. `service` is IGNORED server-side -
 /// Sys stamps it from the verified M2M `client_id` (never caller-supplied).
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
 /// The auditingestitem type.
@@ -4947,13 +4947,13 @@ pub struct AuditIngestResponse {
     pub service: String,
 }
 
-/// `POST /v1/audit` — canonical audit ingest (M2M, `sentin8:sys:audit:write`).
+/// `POST /v1/audit` - canonical audit ingest (M2M, `sentin8:sys:audit:write`).
 ///
 /// DBX : every service pushes its audit events here; Sys persists to
 /// `sys.audit_events` with `service` stamped from the verified `client_id`,
 /// then emits `sentin8:sys:audit:recorded` per event (family `sys`) for
 /// Stat's analytics. A producer keeps a local `{service}.audit_journal`
-/// and retries on failure — audit never drops on a Sys outage.
+/// and retries on failure - audit never drops on a Sys outage.
 #[utoipa::path(
     post,
     operation_id = "audit.ingest",
@@ -4982,7 +4982,7 @@ pub async fn ingest_audit(
     )
     .await?;
 
-    // DBX: `service` is stamped from the verified token's client identity —
+    // DBX: `service` is stamped from the verified token's client identity -
     // for M2M tokens `sub` IS the DCR client_id; user tokens are rejected
     // (M2M-only surface).
     if a.claims.token_tp != "m2m" {
@@ -5037,7 +5037,7 @@ pub async fn ingest_audit(
     // (the shell's relay pushes it to Bus; Stat's embedded worker aggregates).
     //
     // ENV CONTRACT (same as `audit_tx`'s fan-out): rows carry SYSTEM_ENV_ID
-    // — the relay produces with sys's system-env-bound M2M token, so a
+    // - the relay produces with sys's system-env-bound M2M token, so a
     // caller-env row 403s on produce and hot-loops. Each event's own
     // `ev.env_id` rides the payload. The context is re-scoped to the
     // system env ONCE before the loop (the ingest INSERTs above are done;
@@ -5097,11 +5097,11 @@ struct EnvRow {
 // ── Authorization helper ──────────────────────────────────────────────────
 
 /// Resolve the caller's member-org ids via auth's owner API (
-/// ). sys holds NO grants on auth's tables —
+/// ). sys holds NO grants on auth's tables -
 /// membership resolution rides `GET /v1/admin/users/{id}/groups` (M2M
 /// `sentin8:auth:admin:read`). Per-org group names embed the org UUID
 /// (: `sentin8:org:{org_id}:owners/admins/viewers` at SYSTEM_ENV_ID),
-/// so a name match proves membership in exactly that org — no slug
+/// so a name match proves membership in exactly that org - no slug
 /// pattern, no cross-service join.
 async fn member_org_ids_via_auth(user_id: Uuid) -> Result<Vec<Uuid>, (StatusCode, String)> {
     let groups = crate::auth_provision::AuthProvisioner::connect()
@@ -5135,7 +5135,7 @@ async fn member_org_ids_via_auth(user_id: Uuid) -> Result<Vec<Uuid>, (StatusCode
 ///
 /// Delegated tokens (Delegation Gateway) carry `org_id`/`env_id` claims
 /// set to the target org/env. If the token's `org_id` matches the target
-/// org_id, access is already validated by the Delegation Gateway — accept
+/// org_id, access is already validated by the Delegation Gateway - accept
 /// it without further checks.
 ///
 /// For direct user tokens, uses the RBAC group/role model
@@ -5161,14 +5161,14 @@ async fn authorize_org(
 
     // Delegated tokens from the Delegation Gateway carry the target env
     // in their claims. If the token's env_id matches, the Delegation Gateway
-    // already validated RBAC access — accept without further checks.
+    // already validated RBAC access - accept without further checks.
     let token_env = a.claims.env_uuid();
     if token_env == org_id && org_id != sentin8::config::SYSTEM_ORG_ID {
         tx.commit().await.map_err(err_db)?;
         return Ok(());
     }
 
-    // The System Org is NOT a tenant org — platform-level roles (sys:users)
+    // The System Org is NOT a tenant org - platform-level roles (sys:users)
     // are scoped to it but don't represent org membership. Non-admins cannot
     // access the System Org through this authorization path.
     if org_id == sentin8::config::SYSTEM_ORG_ID {
@@ -5178,21 +5178,21 @@ async fn authorize_org(
         ));
     }
     tx.commit().await.map_err(err_db)?;
-    // (/): sys holds NO grants on auth's tables — the
+    // (/): sys holds NO grants on auth's tables - the
     // membership check rides auth's owner API (`GET /v1/admin/users/{id}/groups`,
     // M2M `sentin8:auth:admin:read`; the write scope satisfies `can_read`).
     // The GROUP names embed the org UUID (provisioning assigns the creator
     // to `sentin8:org:{org_id}:owners`; membership invitations add
-    // `:admins`) — any of the three proves membership in THIS org; a
+    // `:admins`) - any of the three proves membership in THIS org; a
     // foreign org's group names do NOT embed this org_id, so cross-org
     // confusion is impossible by construction. (The ROLE names those
-    // groups carry — `sentin8:org:owner/admin/viewer` — are realm-static
+    // groups carry - `sentin8:org:owner/admin/viewer` - are realm-static
     // and shared by every org; matching on roles would admit every
     // org's members to every org. Same resolution as
     // `member_org_ids_via_auth` and `bootstrap`.)
     // The user identity rides the token's `act` claim (auth design, RFC
     // 8693): the sys-proxy hop from auth re-authenticates with auth-sys's
-    // OWN M2M token (sub = client_id — not a user), so the membership check
+    // OWN M2M token (sub = client_id - not a user), so the membership check
     // MUST resolve the acting user from `act.sub` (RFC 8693 `act`).
     let user_id = a.claims.acting_user_uuid().unwrap_or(Uuid::nil());
     let groups = crate::auth_provision::AuthProvisioner::connect()
@@ -5222,16 +5222,16 @@ async fn authorize_org(
     }
 }
 
-// ── Tenant access model provisioning helpers — RETIRED ──────
+// ── Tenant access model provisioning helpers - RETIRED ──────
 // The direct DML helpers (ensure_role / nest_roles / ensure_group /
 // assign_group_role / add_group_member / merge_vertical_admin_roles) are
-// DELETED — sys no longer INSERTs auth.* tables (
+// DELETED - sys no longer INSERTs auth.* tables (
 // ). Provisioning rides auth's membership API
 // (`/v1/admin/provision/*`) via crate::auth_provision.
 // The vertical admin scope merge happens AUTH-side now.
 
 /// Static platform per-service admin roles (auth design role
-/// hierarchy) — SENT to auth's provision API (auth owns the rows; sys only
+/// hierarchy) - SENT to auth's provision API (auth owns the rows; sys only
 /// describes what to provision). Scope vocabulary mirrors the platform
 /// seed (services/auth/sql/init.sql).
 const SERVICE_ADMIN_ROLES: &[(&str, &[&str])] = &[
@@ -5293,17 +5293,17 @@ const SERVICE_ADMIN_ROLES: &[(&str, &[&str])] = &[
     ),
 ];
 
-// ── Tenant access model provisioning — auth-API backed ──────
+// ── Tenant access model provisioning - auth-API backed ──────
 //
 // The three helpers below call AUTH's membership provisioning API
 // (`/v1/admin/provision/*`) with the `sentin8:sys` M2M client
-// (`sentin8:auth:admin:write`) — the former direct INSERTs into
+// (`sentin8:auth:admin:write`) - the former direct INSERTs into
 // `auth.groups/group_members/group_roles/role_nesting/roles/user_roles`
 // are retired ( ): auth is the owner
 // of its tables; sys consumes the owner's API. Idempotent semantics are
 // preserved (auth's endpoints are ON CONFLICT-upserts; Flow's at-least-once
 // retry is safe). The `tx` parameter is retained in the signature so the
-// proxy-back call sites stay stable — HTTP calls are not transactional, so
+// proxy-back call sites stay stable - HTTP calls are not transactional, so
 // the connection is only used for the local identity-invalidation outbox
 // event AFTER the API calls succeed.
 //
@@ -5311,7 +5311,7 @@ const SERVICE_ADMIN_ROLES: &[(&str, &[&str])] = &[
 // provision API's role upsert reads sys.vertical_admin_scopes through the
 // auth-provisioning handler); sys no longer reads that table here.
 
-/// Static platform per-service admin roles — SENT to auth (auth owns the
+/// Static platform per-service admin roles - SENT to auth (auth owns the
 /// rows; sys only describes what to provision for the new realm). Kept in
 /// sync with auth design role hierarchy.
 pub(crate) fn platform_admin_roles() -> Vec<(String, Vec<String>)> {
@@ -5329,8 +5329,8 @@ pub(crate) fn platform_admin_roles() -> Vec<(String, Vec<String>)> {
 /// Provision the tenant access model for a new org (: via auth's
 /// API). Roles: sentin8:org:owner (nests sentin8:org:admin, which nests
 /// sentin8:org:viewer), groups sentin8:org:{org_id}:owners/admins/viewers
-/// ( — names embed the org UUID), creator added to the owners group.
-/// `tx` — the caller's open transaction (used ONLY for the local
+/// ( - names embed the org UUID), creator added to the owners group.
+/// `tx` - the caller's open transaction (used ONLY for the local
 /// identity-invalidation outbox event after the API calls succeed).
 /// Handle provision org access tx.
 pub async fn provision_org_access_tx(
@@ -5344,7 +5344,7 @@ pub async fn provision_org_access_tx(
         .map_err(|e| sqlx::Error::Configuration(format!("auth provisioner connect: {e}").into()))?;
 
     // Option A ( revision): org:admin NEVER carries `sentin8:holder:view-all`
-    // — the scope is M2M-only.
+    // - the scope is M2M-only.
     let org_scopes: Vec<String> = vec![
         "sentin8:sys:org:admin".into(),
         "sentin8:sys:memberships:admin".into(),
@@ -5388,8 +5388,8 @@ pub async fn provision_org_access_tx(
         .map_err(auth_err)?;
 
     // 2. Per-service admin roles (platform core) + runtime-registered
-    // vertical admin roles ( — read from sys.vertical_admin_scopes, sys's
-    // OWN table; the earlier comment claiming an auth-side merge was wrong —
+    // vertical admin roles ( - read from sys.vertical_admin_scopes, sys's
+    // OWN table; the earlier comment claiming an auth-side merge was wrong -
     // auth never read that table, so vertical services' admin scopes
     // (acme/ai/post/proxy/captain) were absent from every realm. Incident
     // run 29).
@@ -5435,7 +5435,7 @@ pub async fn provision_org_access_tx(
             .map_err(auth_err)?;
     }
 
-    // 3. Groups ( — org UUID makes the names globally unique).
+    // 3. Groups ( - org UUID makes the names globally unique).
     let owners_group = format!("sentin8:org:{org_id}:owners");
     let admins_group = format!("sentin8:org:{org_id}:admins");
     let viewers_group = format!("sentin8:org:{org_id}:viewers");
@@ -5476,7 +5476,7 @@ pub async fn provision_org_access_tx(
     }
 
     // 5. Identity-cache invalidation (policy design -1, inbox-first):
-    // the creator just received org-scoped access — local outbox event
+    // the creator just received org-scoped access - local outbox event
     // (sys's own stream family; rides the caller's transaction).
     emit_policy_identity_event_tx(
         tx,
@@ -5567,20 +5567,20 @@ pub async fn provision_env_access_tx(
     Ok(())
 }
 
-/// Provision the env-scoped access model (env realm roles + groups) —
+/// Provision the env-scoped access model (env realm roles + groups) -
 /// : via auth's API. Split out so the env creation step can run
 /// it against the env's own env_id. Also seeds the env's platform policy
 /// sets + emits the policy-updated event (sys-domain logic, unchanged).
 /// Handle provision env realm tx.
 /// Copy every `origin='platform'` policy set from the SYSTEM env into
-/// `env_id` — the new env's platform policy template (sys owns the
+/// `env_id` - the new env's platform policy template (sys owns the
 /// policy_sets table). Extracted from `provision_env_realm_tx` so the
 /// env-access provisioning can seed policies BEFORE the auth
 /// provisioning calls: auth's provision endpoint is Shield-gated
 /// per-env and denies fail-closed (`no_set_for_env`) for an env with
 /// no policy sets yet (the e2e org/env creation deadlock).
 /// Copy every `origin='platform'` policy set from the SYSTEM env into
-/// `env_id` — the new env's platform policy template (sys owns the
+/// `env_id` - the new env's platform policy template (sys owns the
 /// policy_sets table). Extracted from `provision_env_realm_tx` so the
 /// env-access provisioning can seed policies BEFORE the auth
 /// provisioning calls: auth's provision endpoint is Shield-gated
@@ -5606,7 +5606,7 @@ pub async fn seed_env_platform_policies_tx(
     .map(|r| r.rows_affected())
 }
 
-/// Provision the env-scoped access model (env realm roles + groups) —
+/// Provision the env-scoped access model (env realm roles + groups) -
 /// via auth's API. Split out so the env creation step can run it
 /// against the env's own env_id. Also seeds the env's platform policy
 /// sets + emits the policy-updated event (sys-domain logic, unchanged).
@@ -5658,7 +5658,7 @@ pub async fn provision_env_realm_tx(
     // runtime vertical admin roles: the static list above covers only
     // the platform core services; every VERTICAL service registers its admin
     // scopes in sys.vertical_admin_scopes at `vertical enroll` time and they
-    // must ride the same env:admin nesting in every realm — no realm
+    // must ride the same env:admin nesting in every realm - no realm
     // ever carries a vertical's admin scope by default. The table is
     // sys's own.
     let vertical_rows = sqlx::query_as::<_, (String, String)>(
@@ -5721,15 +5721,15 @@ pub async fn provision_env_realm_tx(
 
     // Seed the new env's platform policy sets (policy design ): copy
     // each `origin='platform'` set from the system env as the template.
-    // (Unchanged — sys owns the policy_sets table.)
+    // (Unchanged - sys owns the policy_sets table.)
     // Order note: the env-access flow calls `seed_env_platform_policies_tx`
-    // FIRST (before the auth provisioning calls) — auth's provision
+    // FIRST (before the auth provisioning calls) - auth's provision
     // endpoint is Shield-gated per-env and denies fail-closed
     // (`no_set_for_env`) when the env has no policy sets yet.
     let seeded = crate::handlers::seed_env_platform_policies_tx(tx, env_id).await?;
     tracing::info!(%env_id, sets = seeded, "sys: seeded per-env platform policy sets");
 
-    // Hot-reload notification (policy design ) — local outbox insert.
+    // Hot-reload notification (policy design ) - local outbox insert.
     if let Err(e) = sentin8::bus::outbox::insert_outbox_row(
         tx,
         sentin8::config::SYSTEM_ENV_ID,
@@ -5764,7 +5764,7 @@ fn auth_err(e: anyhow::Error) -> sqlx::Error {
 /// (create-org handler body, sys DESIGN §2 "Org creation lifecycle").
 /// The org row is already committed; this runs the auth provisioning
 /// calls (idempotent) and commits the identity-invalidation outbox row.
-/// Returns Err on any failure — the caller compensates by deleting the
+/// Returns Err on any failure - the caller compensates by deleting the
 /// org record.
 pub async fn provision_org_access(
     pool: &sqlx::PgPool,
@@ -5773,7 +5773,7 @@ pub async fn provision_org_access(
 ) -> Result<(), sqlx::Error> {
     let mut tx = pool.begin().await?;
     // Tenant context: the outbox row inside provision_org_access_tx is
-    // FORCE-RLS'd on (context_initialized, env_id) — SYSTEM_ENV_ID is the
+    // FORCE-RLS'd on (context_initialized, env_id) - SYSTEM_ENV_ID is the
     // tenant these rows belong to (the sys-realm identity event).
     let _ = sqlx::query("SELECT sentin8_set_tenant_context($1)")
         .bind(sentin8::config::SYSTEM_ENV_ID)
@@ -5788,7 +5788,7 @@ pub async fn provision_org_access(
     .await?;
     tx.commit().await?;
     // Read-your-writes (sys DESIGN §2, backlog RYW-1): the org-scoped
-    // grant lives in the SYSTEM env realm — sweep THIS process's
+    // grant lives in the SYSTEM env realm - sweep THIS process's
     // resolver cache post-commit so the creator's next request (which
     // may land on the same process) sees the grant without waiting for
     // the async bus event.
@@ -5799,11 +5799,11 @@ pub async fn provision_org_access(
 /// Synchronously provision the access model for a new env
 /// (create-env handler body, sys DESIGN §2). The env row is already
 /// committed; this seeds the env's platform policy sets (committed
-/// BEFORE the auth provisioning calls — auth's provision endpoint is
+/// BEFORE the auth provisioning calls - auth's provision endpoint is
 /// Shield-gated per-env and denies fail-closed `no_set_for_env` for an
 /// env with no sets; an uncommitted seed is invisible cross-process),
 /// then runs the org-scoped + env-scoped realm provisioning.
-/// Returns Err on any failure — the caller compensates by deleting the
+/// Returns Err on any failure - the caller compensates by deleting the
 /// env record.
 pub async fn provision_env_access(
     pool: &sqlx::PgPool,
@@ -5812,7 +5812,7 @@ pub async fn provision_env_access(
     creator_user_id: Uuid,
 ) -> Result<(), sqlx::Error> {
     // Seed the env's platform policy sets in their OWN committed
-    // transaction FIRST. Idempotent (ON CONFLICT DO NOTHING) — the realm
+    // transaction FIRST. Idempotent (ON CONFLICT DO NOTHING) - the realm
     // provisioning's seed below is a no-op.
     {
         let mut seed_tx = pool.begin().await?;
@@ -5834,12 +5834,12 @@ pub async fn provision_env_access(
     provision_env_access_tx(&mut tx, org_id, env_id, creator_user_id).await?;
     // Env-scoped realm provisioning: provision sentin8:env:admin/env:viewer
     // roles + groups in the env's own realm (the seed inside is now a
-    // no-op ON CONFLICT — the sets landed above).
+    // no-op ON CONFLICT - the sets landed above).
     provision_env_realm_tx(&mut tx, org_id, env_id, creator_user_id).await?;
     tx.commit().await?;
     // Read-your-writes (sys DESIGN §2, backlog RYW-1): env creation
     // grants in BOTH the SYSTEM realm (org-scoped env access) and the
-    // new env's own realm — sweep THIS process's resolver for both.
+    // new env's own realm - sweep THIS process's resolver for both.
     crate::policy::invalidate_local_identity_caches([sentin8::config::SYSTEM_ENV_ID, env_id]);
     Ok(())
 }

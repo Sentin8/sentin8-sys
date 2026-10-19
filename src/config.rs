@@ -18,7 +18,7 @@ use sentin8::auth::client::{Client as AuthClient, ClientOptions};
 pub struct SysConfig {
     /// The port.
     pub port: u16,
-    /// Shared Auth client — constructed once so the discovery and JWKS
+    /// Shared Auth client - constructed once so the discovery and JWKS
     /// caches are reused across every request (5-minute TTL each).
     /// Cloning is cheap (the caches live behind an `Arc`).
     /// The auth client.

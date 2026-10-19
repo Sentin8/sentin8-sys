@@ -7,16 +7,16 @@
 //!
 //! Sys's Flow proxy-back provisioning steps call **auth's membership
 //! provisioning API** (`POST /v1/admin/provision/*`) instead of INSERTing
-//! `auth.*` tables directly — the cross-service table access is retired
+//! `auth.*` tables directly - the cross-service table access is retired
 //! : the owner exposes the verbs, sys holds a token
 //! (`sentin8:auth:admin:write` on the `sentin8:sys` workload).
 //!
 //! Every call is idempotent (auth's endpoints use `ON CONFLICT` semantics),
 //! matching Flow's at-least-once retry. Failures propagate as sqlx-unmapped
-//! errors to the proxy-back step (fail-closed — a provisioning step that
+//! errors to the proxy-back step (fail-closed - a provisioning step that
 //! fails surfaces to Flow's retry/DLQ, never silently skipped).
 
-/// Auth provisioning API client — **certificate-presenting** (,
+/// Auth provisioning API client - **certificate-presenting** (,
 /// auth DESIGN §4.3f): the `sentin8:sys` CERTIFICATE is the identity,
 /// presented on the TLS handshake of every call; Auth's TLS layer
 /// authenticates it. No bearer token exists on this path.
@@ -29,7 +29,7 @@ impl AuthProvisioner {
     /// Build (or reuse) the process provisioner. Ensures the
     /// `sentin8:sys` workload certificate (load-or-mint from Acme) and
     /// builds the cert-presenting transport. The registry map authorizes
-    /// the workload's scopes (`sentin8:auth:admin:write`/`read`) —
+    /// the workload's scopes (`sentin8:auth:admin:write`/`read`) -
     /// resolved LIVE per call server-side.
     pub async fn connect() -> anyhow::Result<Self> {
         let issuer = sentin8::config::Sentin8Config::from_env().sentin8_auth_issuer();
@@ -52,11 +52,11 @@ impl AuthProvisioner {
     /// POST to auth's admin provisioning API.
     ///
     /// `x-sentin8-target-env-id` header (auth design /): auth is
-    /// env-scoped — the body's `env_id` alone does NOT authorize the target;
+    /// env-scoped - the body's `env_id` alone does NOT authorize the target;
     /// the header IS the target-env declaration the access check reads
     /// (`x-sentin8-target-env-id`, services/auth/src/provision.rs
     /// `authorize_provisioning`). Without it every provisioning call 400s
-    /// ("missing target_env_id — auth is env-scoped", :
+    /// ("missing target_env_id - auth is env-scoped", :
     /// org-create failed at `provision_org_access`). The env rides in each
     /// request body under the `env_id` key; when absent (no tenant scope)
     /// the header is omitted and auth resolves SYSTEM env defaults.
@@ -77,7 +77,7 @@ impl AuthProvisioner {
         Ok(serde_json::from_str(&text).unwrap_or(serde_json::Value::Null))
     }
 
-    /// GET from auth's admin API (read path — `sentin8:auth:admin:read` or
+    /// GET from auth's admin API (read path - `sentin8:auth:admin:read` or
     /// the `admin:write` scope satisfies `can_read`, sentin8or_auth.rs).
     /// The `target_env_id` query param declares the target env (auth is
     /// env-scoped, same rule as `post`'s header).
@@ -95,7 +95,7 @@ impl AuthProvisioner {
     /// The user's resolved role names (auth-side closure over direct +
     /// group-assigned roles + nesting). Read path for cross-service
     /// authorization checks (: sys holds NO grants on auth's
-    /// tables — the check rides auth's
+    /// tables - the check rides auth's
     /// `GET /v1/admin/users/{id}/roles` API).
     /// Handle user roles.
     pub async fn user_roles(
@@ -117,7 +117,7 @@ impl AuthProvisioner {
 
     /// The user's group names in `env_id` (owner-API read, :
     /// bootstrap membership resolution rides auth's
-    /// `GET /v1/admin/users/{id}/groups` — sys holds NO grants on
+    /// `GET /v1/admin/users/{id}/groups` - sys holds NO grants on
     /// auth's tables). Per-org group names embed the org UUID (:
     /// `sentin8:org:{org_id}:owners/admins/viewers` at SYSTEM_ENV_ID),
     /// so an org id match proves membership in that org.

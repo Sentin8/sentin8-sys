@@ -6,7 +6,7 @@
 //! `sys-post` pusher task (sys DESIGN §10, DBX-POST-3).
 //!
 //! Drains `sys.post_outbox` (rows enqueued in the SAME transaction as the
-//! domain change — invitation sent/accepted mails) to Sentin8:Post's
+//! domain change - invitation sent/accepted mails) to Sentin8:Post's
 //! `POST /v1/send` with the `sys-post` M2M identity (scope
 //! `sentin8:post:write`). sys never writes `post.inbox` directly and holds
 //! no INSERT grant on Post's internal tables (principles §6.7).
@@ -17,16 +17,16 @@
 //! `sys_post_outbox_unpushed_envs()` returns only the env UUIDs with
 //! unpushed rows; each env's rows are then selected and marked pushed
 //! under that env's tenant context (same-transaction rule). Post receives
-//! the per-row env via the `X-Sentin8-Env-Id` header — the contract its
+//! the per-row env via the `X-Sentin8-Env-Id` header - the contract its
 //! send API resolves tenant context from.
 //!
 //! Identity lifecycle mirrors the audit-pusher pattern (crates/audit):
 //! the cert-presenting transport is resolved ONCE for the process
-//! lifetime and reused across passes — a per-pass DCR load + credential
+//! lifetime and reused across passes - a per-pass DCR load + credential
 //! probe + fresh PQ-TLS client would ratchet allocator arenas. Stale
 //! identities re-establish through the certificate transport's own
 //! single-flight self-heal. Failures leave rows unpushed for the next
-//! pass — a Post outage never drops notifications.
+//! pass - a Post outage never drops notifications.
 
 use sqlx::{PgConnection, PgPool};
 use uuid::Uuid;
@@ -35,9 +35,9 @@ use uuid::Uuid;
 pub fn spawn_post_pusher(pool: PgPool, post_url: String, auth_issuer: String) {
     tokio::spawn(async move {
         // auth DESIGN §4.3f: the `sys-post` CERTIFICATE is the
-        // identity — ensure it once (mint retries while Acme comes up),
+        // identity - ensure it once (mint retries while Acme comes up),
         // then build the ONE cert-presenting client for the task lifetime
-        // (connection reuse across passes; webhook relay pattern — a
+        // (connection reuse across passes; webhook relay pattern - a
         // per-pass client churns pools). No token exists on this path.
         let cert = loop {
             match sentin8::auth::m2m::ensure_workload_certificate(
@@ -62,7 +62,7 @@ pub fn spawn_post_pusher(pool: PgPool, post_url: String, auth_issuer: String) {
         let client = match sentin8::middleware::mtls::build_mtls_client(&mtls) {
             Ok(c) => c,
             Err(e) => {
-                tracing::warn!(error = %e, "sys: post push transport build failed — pusher disabled");
+                tracing::warn!(error = %e, "sys: post push transport build failed - pusher disabled");
                 return;
             }
         };
@@ -90,14 +90,14 @@ struct PendingRow {
 }
 
 /// One drain pass: list envs with unpushed rows (SECURITY DEFINER), then
-/// per env — under that env's context — select up to 50 rows, push each to
+/// per env - under that env's context - select up to 50 rows, push each to
 /// `POST /v1/send` (per-row `X-Sentin8-Env-Id`), and mark pushed on 2xx.
 async fn drain_and_push_post(
     pool: &PgPool,
     client: &reqwest::Client,
     post_url: &str,
 ) -> anyhow::Result<usize> {
-    // Envs that have unpushed rows (owner-side helper — no row content).
+    // Envs that have unpushed rows (owner-side helper - no row content).
     let envs: Vec<Uuid> = sqlx::query_scalar("SELECT env_id FROM sys_post_outbox_unpushed_envs()")
         .fetch_all(pool)
         .await?;
@@ -105,7 +105,7 @@ async fn drain_and_push_post(
     let mut pushed = 0usize;
     for env_id in envs {
         // Read the batch under the env's context (FORCE RLS; one explicit
-        // transaction per env — the context is transaction-local).
+        // transaction per env - the context is transaction-local).
         let mut tx = pool.begin().await?;
         set_context(&mut tx, env_id).await;
         let rows = sqlx::query_as::<
@@ -158,13 +158,13 @@ async fn drain_and_push_post(
             };
             match push_one(pool, client, post_url, &row).await {
                 Ok(true) => pushed += 1,
-                Ok(false) => {} // rejected/failed — retried next pass
+                Ok(false) => {} // rejected/failed - retried next pass
                 Err(e) => {
-                    tracing::warn!(error = %e, message_id = %row.id, "sys: post push row failed — retried next pass");
+                    tracing::warn!(error = %e, message_id = %row.id, "sys: post push row failed - retried next pass");
                 }
             }
             if pushed >= 100 {
-                return Ok(pushed); // batch cap — next pass continues
+                return Ok(pushed); // batch cap - next pass continues
             }
         }
     }
@@ -202,11 +202,11 @@ async fn push_one(
             Ok(n > 0)
         }
         Ok(r) => {
-            tracing::warn!(status = %r.status(), message_type = %row.message_type, "sys: post send rejected — will retry");
+            tracing::warn!(status = %r.status(), message_type = %row.message_type, "sys: post send rejected - will retry");
             Ok(false)
         }
         Err(e) => {
-            tracing::warn!(error = %e, message_type = %row.message_type, "sys: post send failed — will retry");
+            tracing::warn!(error = %e, message_type = %row.message_type, "sys: post send failed - will retry");
             Ok(false)
         }
     }
@@ -227,7 +227,7 @@ async fn mark_pushed(pool: &PgPool, env_id: Uuid, id: Uuid) -> anyhow::Result<u6
     Ok(n)
 }
 
-/// Set the tenant context on a transaction (transaction-local GUCs —
+/// Set the tenant context on a transaction (transaction-local GUCs -
 /// sys DESIGN §5 same-connection rule).
 async fn set_context(conn: &mut PgConnection, env_id: Uuid) {
     let _ = sqlx::query("SELECT sentin8_set_tenant_context($1, '', '', '', false, false)")
