@@ -308,7 +308,7 @@ async fn emit_post_notification_tx(
 #[utoipa::path(
     get,
     path = "/v1/health",
-    responses((status = 200, description = "Service is healthy", body = serde_json::Value)),
+    responses((status = 200, description = "Service is healthy", body = sentin8::middleware::health::LiveHealth)),
     tag = "sys",
 )]
 /// Handle health.
@@ -326,7 +326,7 @@ pub async fn health(State(_state): State<AppState>) -> Json<serde_json::Value> {
     operation_id = "readiness.get",
     path = "/v1/readiness",
     responses(
-        (status = 200, description = "Service is ready", body = serde_json::Value),
+        (status = 200, description = "Service is ready", body = ReadinessResponse),
         (status = 503, description = "Database unavailable"),
     ),
     tag = "sys",
@@ -334,7 +334,7 @@ pub async fn health(State(_state): State<AppState>) -> Json<serde_json::Value> {
 /// Handle readiness.
 pub async fn readiness(
     State(state): State<AppState>,
-) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+) -> Result<Json<ReadinessResponse>, (StatusCode, String)> {
     let pg_ok = sqlx::query("SELECT 1").execute(&state.pool).await.is_ok();
     let status = if pg_ok { "ready" } else { "degraded" };
     let code = if pg_ok {
@@ -345,10 +345,12 @@ pub async fn readiness(
     if !pg_ok {
         return Err((code, "database unavailable".into()));
     }
-    Ok(Json(serde_json::json!({
-        "status": status,
-        "checks": { "postgres": "ok" },
-    })))
+    let mut checks = std::collections::BTreeMap::new();
+    checks.insert("postgres".to_string(), "ok".to_string());
+    Ok(Json(ReadinessResponse {
+        status: status.to_string(),
+        checks,
+    }))
 }
 
 /// `GET /v1/verticals/services?orgId={uuid}&envId={uuid}` - discover registered
@@ -623,11 +625,11 @@ pub const PLATFORM_SCOPE_CATALOG: &[&str] = &[
 #[utoipa::path(
     get,
     path = "/v1/scopes/catalog",
-    responses((status = 200, description = "Scope catalog", body = serde_json::Value)),
+    responses((status = 200, description = "Scope catalog", body = ScopeCatalogResponse)),
     tag = "sys",
 )]
 /// Fetch scope catalog.
-pub async fn get_scope_catalog(State(state): State<AppState>) -> Json<serde_json::Value> {
+pub async fn get_scope_catalog(State(state): State<AppState>) -> Json<ScopeCatalogResponse> {
     let mut scopes: Vec<String> = PLATFORM_SCOPE_CATALOG
         .iter()
         .map(|s| s.to_string())
@@ -649,7 +651,7 @@ pub async fn get_scope_catalog(State(state): State<AppState>) -> Json<serde_json
 
     scopes.sort();
     scopes.dedup();
-    Json(serde_json::json!({ "scopes": scopes }))
+    Json(ScopeCatalogResponse { scopes })
 }
 
 // ── Organization API (Stories) ────────────────────────
@@ -2475,7 +2477,7 @@ pub async fn get_application(
     operation_id = "app.update",
     path = "/v1/env/{env_id}/applications/{app_id}",
     params(("env_id" = Uuid, Path, description = "Environment ID"), ("app_id" = Uuid, Path, description = "Application ID")),
-    request_body = serde_json::Value,
+    request_body = ApplicationUpdateRequest,
     responses(
         (status = 200, description = "Application updated", body = ApplicationResponse),
         (status = 404, description = "Not found"),
@@ -3854,7 +3856,7 @@ pub struct BootstrapResponse {
     path = "/v1/env/{env_id}/auth-domain",
     params(("env_id" = Uuid, Path, description = "Environment ID")),
     responses(
-        (status = 200, description = "Auth domain", body = serde_json::Value),
+        (status = 200, description = "Auth domain", body = AuthDomainResponse),
         (status = 404, description = "Environment not found"),
     ),
     tag = "sys",
@@ -3864,7 +3866,7 @@ pub async fn get_env_auth_domain(
     State(state): State<AppState>,
     headers: HeaderMap,
     Path(env_id): Path<Uuid>,
-) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+) -> Result<Json<AuthDomainResponse>, (StatusCode, String)> {
     // BFF-only surface - zero-trust (sys design ). Step 5 decides:
     // the enforced scope-mirror permits `sentin8:sys:instances:read` (the
     // BFF delegator's M2M scope) and any broader sys admin scope.
@@ -3925,7 +3927,7 @@ pub async fn get_env_auth_domain(
         None => String::new(),
     };
 
-    Ok(Json(serde_json::json!({ "auth_domain": auth_domain })))
+    Ok(Json(AuthDomainResponse { auth_domain }))
 }
 
 /// Query params for `get_instance_scopes`.
@@ -3944,7 +3946,7 @@ pub struct InstanceScopesQuery {
     path = "/v1/app-instance/scopes",
     params(("hostname" = String, Query, description = "BFF or frontend hostname")),
     responses(
-        (status = 200, description = "Instance scopes", body = serde_json::Value),
+        (status = 200, description = "Instance scopes", body = InstanceScopesResponse),
         (status = 400, description = "hostname query param is required"),
     ),
     tag = "sys",
@@ -3954,7 +3956,7 @@ pub async fn get_instance_scopes(
     State(state): State<AppState>,
     headers: HeaderMap,
     Query(q): Query<InstanceScopesQuery>,
-) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+) -> Result<Json<InstanceScopesResponse>, (StatusCode, String)> {
     // BFF-only surface - zero-trust (sys design ). Step 5 decides:
     // the enforced scope-mirror permits `sentin8:sys:instances:read` (the
     // BFF delegator's M2M scope) and any broader sys admin scope.
@@ -4000,18 +4002,18 @@ pub async fn get_instance_scopes(
     .await
     .map_err(err_db)?;
     match row {
-        Some(r) => Ok(Json(serde_json::json!({
-            "allowed_scopes": r.try_get::<Vec<String>, _>("allowed_scopes").unwrap_or_default(),
-            "allowed_services": r.try_get::<Vec<String>, _>("allowed_services").unwrap_or_default(),
-            "oauth_client_id": r.try_get::<String, _>("oauth_client_id").unwrap_or_default(),
-        }))),
+        Some(r) => Ok(Json(InstanceScopesResponse {
+            allowed_scopes: r.try_get::<Vec<String>, _>("allowed_scopes").unwrap_or_default(),
+            allowed_services: r.try_get::<Vec<String>, _>("allowed_services").unwrap_or_default(),
+            oauth_client_id: r.try_get::<String, _>("oauth_client_id").unwrap_or_default(),
+        })),
         None => {
             tracing::warn!(%host, "sys: get_instance_scopes no instance found");
-            Ok(Json(serde_json::json!({
-                "allowed_scopes": [],
-                "allowed_services": [],
-                "oauth_client_id": "",
-            })))
+            Ok(Json(InstanceScopesResponse {
+                allowed_scopes: vec![],
+                allowed_services: vec![],
+                oauth_client_id: String::new(),
+            }))
         }
     }
 }
@@ -4043,7 +4045,7 @@ pub async fn get_instance_scopes(
     path = "/v1/tenants/{env_id}",
     params(("env_id" = Uuid, Path, description = "Target environment id")),
     responses(
-        (status = 200, description = "Tenant snapshot + the caller's own service enablement", body = serde_json::Value),
+        (status = 200, description = "Tenant snapshot + the caller's own service enablement", body = TenantSnapshotResponse),
         (status = 401, description = "Missing/invalid token"),
         (status = 403, description = "Missing tenants:read scope or non-M2M token"),
         (status = 404, description = "Env unknown or the caller's service is not enabled there (scoped discovery)"),
@@ -4056,7 +4058,7 @@ pub async fn get_tenant_snapshot(
     State(state): State<AppState>,
     headers: HeaderMap,
     Path(env_id): Path<Uuid>,
-) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+) -> Result<Json<TenantSnapshotResponse>, (StatusCode, String)> {
     let a = auth::verify(&state.workload_registry, &state.config, &headers).await?;
     crate::policy::require_policy(
         &state.policy,
@@ -4146,22 +4148,22 @@ pub async fn get_tenant_snapshot(
         else {
             return Err(not_found());
         };
-        return Ok(Json(serde_json::json!({
-            "env_id": e_id,
-            "env_slug": e_slug,
-            "env_display_name": e_name,
-            "status": e_status,
-            "auth_domain": auth_domain,
-            "org_id": o_id,
-            "org_slug": o_slug,
-            "org_display_name": o_name,
-            "org_domain": o_domain,
-            "service": {
-                "service": caller_service,
-                "enabled": true,
-                "config": serde_json::Value::Null,
+        return Ok(Json(TenantSnapshotResponse {
+            env_id: e_id,
+            env_slug: e_slug,
+            env_display_name: e_name,
+            status: e_status,
+            auth_domain,
+            org_id: o_id,
+            org_slug: o_slug,
+            org_display_name: o_name,
+            org_domain: o_domain,
+            service: TenantServiceEnablement {
+                service: caller_service,
+                enabled: true,
+                config: serde_json::Value::Null,
             },
-        })));
+        }));
     }
     let caller_leaf = caller_service.rsplit(':').next().unwrap_or(&caller_service);
     // Enablement gate: the caller's service must be enabled SOMEWHERE in
@@ -4224,22 +4226,22 @@ pub async fn get_tenant_snapshot(
         return Err(not_found());
     };
 
-    Ok(Json(serde_json::json!({
-        "env_id": e_id,
-        "env_slug": e_slug,
-        "env_display_name": e_name,
-        "status": e_status,
-        "auth_domain": auth_domain,
-        "org_id": o_id,
-        "org_slug": o_slug,
-        "org_display_name": o_name,
-        "org_domain": o_domain,
-        "service": {
-            "service": caller_service,
-            "enabled": enabled,
-            "config": config,
-        },
-    })))
+        Ok(Json(TenantSnapshotResponse {
+            env_id: e_id,
+            env_slug: e_slug,
+            env_display_name: e_name,
+            status: e_status,
+            auth_domain,
+            org_id: o_id,
+            org_slug: o_slug,
+            org_display_name: o_name,
+            org_domain: o_domain,
+            service: TenantServiceEnablement {
+                service: caller_service,
+                enabled: enabled,
+                config: config,
+            },
+        }))
 }
 
 /// `GET /v1/resolve/hostname` - : the single cache-miss path for
@@ -4252,7 +4254,7 @@ pub async fn get_tenant_snapshot(
     path = "/v1/resolve/hostname",
     params(("hostname" = Option<String>, Query, description = "Fully-qualified hostname to resolve")),
     responses(
-        (status = 200, description = "Hostname mapping (service, org_id, env_id, app_id)", body = serde_json::Value),
+        (status = 200, description = "Hostname mapping (service, org_id, env_id, app_id)", body = HostnameResolveResponse),
         (status = 400, description = "hostname query param is required"),
         (status = 404, description = "Hostname not resolvable"),
     ),
@@ -4264,7 +4266,7 @@ pub async fn resolve_hostname(
     State(state): State<AppState>,
     headers: HeaderMap,
     Query(q): Query<std::collections::HashMap<String, String>>,
-) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+) -> Result<Json<HostnameResolveResponse>, (StatusCode, String)> {
     let a = auth::verify(&state.workload_registry, &state.config, &headers).await?;
     crate::policy::require_policy(
         &state.policy,
@@ -4319,13 +4321,13 @@ pub async fn resolve_hostname(
             Some(serde_json::json!({ "via": "app_instance" })),
         )
         .await;
-        return Ok(Json(serde_json::json!({
-            "hostname": host,
-            "service": "sentin8:web",
-            "org_id": r.try_get::<Uuid, _>("org_id").ok().map(|u| u.to_string()),
-            "env_id": r.try_get::<Uuid, _>("env_id").ok().map(|u| u.to_string()),
-            "app_id": r.try_get::<Uuid, _>("id").ok().map(|u| u.to_string()),
-        })));
+        return Ok(Json(HostnameResolveResponse {
+            hostname: host,
+            service: "sentin8:web".to_string(),
+            org_id: r.try_get::<Uuid, _>("org_id").ok().map(|u| u.to_string()),
+            env_id: r.try_get::<Uuid, _>("env_id").ok().map(|u| u.to_string()),
+            app_id: r.try_get::<Uuid, _>("id").ok().map(|u| u.to_string()),
+        }));
     }
 
     // 2. Org-domain suffix walk (the sentin8-tls deduce logic, owner side):
@@ -4395,13 +4397,13 @@ pub async fn resolve_hostname(
             Some(serde_json::json!({ "via": "org_domain", "service": service })),
         )
         .await;
-        return Ok(Json(serde_json::json!({
-            "hostname": host,
-            "service": service,
-            "org_id": org_id.to_string(),
-            "env_id": env_id.map(|u| u.to_string()),
-            "app_id": serde_json::Value::Null,
-        })));
+        return Ok(Json(HostnameResolveResponse {
+            hostname: host,
+            service,
+            org_id: Some(org_id.to_string()),
+            env_id: env_id.map(|u| u.to_string()),
+            app_id: None,
+        }));
     }
 
     Err((
@@ -4430,7 +4432,7 @@ fn service_label_key<'a>(labels: &[&'a str], suffix_len: usize) -> &'a str {
     path = "/v1/app-instance/auth-mode",
     params(("hostname" = Option<String>, Query, description = "BFF or frontend hostname"), ("app_id" = Option<String>, Query, description = "App instance ID")),
     responses(
-        (status = 200, description = "Auth mode", body = serde_json::Value),
+        (status = 200, description = "Auth mode", body = InstanceAuthModeResponse),
         (status = 400, description = "hostname or app_id query param is required"),
     ),
     tag = "sys",
@@ -4440,7 +4442,7 @@ pub async fn get_instance_auth_mode(
     State(state): State<AppState>,
     headers: HeaderMap,
     Query(q): Query<InstanceAuthModeQuery>,
-) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+) -> Result<Json<InstanceAuthModeResponse>, (StatusCode, String)> {
     // BFF-only surface - zero-trust (sys design ). Step 5 decides:
     // the enforced scope-mirror permits `sentin8:sys:instances:read` (the
     // BFF delegator's M2M scope) and any broader sys admin scope.
@@ -4503,43 +4505,43 @@ pub async fn get_instance_auth_mode(
         .map_err(err_db)?
     };
     match row {
-        Some(r) => Ok(Json(serde_json::json!({
+        Some(r) => Ok(Json(InstanceAuthModeResponse {
         // Stories - full instance identity so the BFF can bind
         // sessions to the creating app (application_id), run the
         // auth-env match (token env vs instance env), and enforce the
         // sentin8:app:{instance_id} group gate at callback
         // (BFF design ; name per ).
-                   "application_id": r.try_get::<Uuid, _>("id").map(|u| u.to_string()).unwrap_or_default(),
-                   "org_id": r.try_get::<Uuid, _>("org_id").map(|u| u.to_string()).unwrap_or_default(),
-                   "env_id": r.try_get::<Uuid, _>("env_id").map(|u| u.to_string()).unwrap_or_default(),
-                   "instance_name": r.try_get::<String, _>("instance_name").unwrap_or_default(),
-                   "app_slug": r.try_get::<String, _>("app_slug").unwrap_or_default(),
-                   "auth_domain": r.try_get::<Option<String>, _>("auth_domain").ok().flatten().unwrap_or_default(),
-                   "allow_signup": r.try_get::<bool, _>("allow_signup").unwrap_or(true),
+                   application_id: r.try_get::<Uuid, _>("id").map(|u| u.to_string()).unwrap_or_default(),
+                   org_id: r.try_get::<Uuid, _>("org_id").map(|u| u.to_string()).unwrap_or_default(),
+                   env_id: r.try_get::<Uuid, _>("env_id").map(|u| u.to_string()).unwrap_or_default(),
+                   instance_name: r.try_get::<String, _>("instance_name").unwrap_or_default(),
+                   app_slug: r.try_get::<String, _>("app_slug").unwrap_or_default(),
+                   auth_domain: r.try_get::<Option<String>, _>("auth_domain").ok().flatten().unwrap_or_default(),
+                   allow_signup: r.try_get::<bool, _>("allow_signup").unwrap_or(true),
         // BFF F-A group-gate mode (see BFF design ): 'strict' →
         // membership required; 'self_service' → authentication + D3
         // auth-env match is sufficient. Defaults to 'strict' so the
         // fail-closed rule applies to every instance that predates
         // the column.
-                   "group_gate": r.try_get::<Option<String>, _>("group_gate").ok().flatten().filter(|g| !g.is_empty()).unwrap_or_else(|| "strict".to_string()),
-                   "oauth_client_id": r.try_get::<Option<String>, _>("oauth_client_id").ok().flatten().unwrap_or_default(),
+                   group_gate: r.try_get::<Option<String>, _>("group_gate").ok().flatten().filter(|g| !g.is_empty()).unwrap_or_else(|| "strict".to_string()),
+                   oauth_client_id: r.try_get::<Option<String>, _>("oauth_client_id").ok().flatten().unwrap_or_default(),
                    // Staff-mode CIBA client - the app-instance client registered
                    // at the CUSTOMER env's auth (empty when the instance is not
                    // staff-mode; ciba.rs falls back to oauth_client_id).
-                   "ciba_oauth_client_id": r.try_get::<Option<String>, _>("ciba_oauth_client_id").ok().flatten().unwrap_or_default(),
-               }))),
-        None => Ok(Json(serde_json::json!({
-            "application_id": "",
-            "org_id": "",
-            "env_id": "",
-            "instance_name": "",
-            "app_slug": "",
-            "auth_domain": "",
-            "allow_signup": true,
-            "group_gate": "strict",
-            "oauth_client_id": "",
-            "ciba_oauth_client_id": "",
-        }))),
+                   ciba_oauth_client_id: r.try_get::<Option<String>, _>("ciba_oauth_client_id").ok().flatten().unwrap_or_default(),
+                       }),),
+        None => Ok(Json(InstanceAuthModeResponse {
+            application_id: String::new(),
+            org_id: String::new(),
+            env_id: String::new(),
+            instance_name: String::new(),
+            app_slug: String::new(),
+            auth_domain: String::new(),
+            allow_signup: true,
+            group_gate: "strict".to_string(),
+            oauth_client_id: String::new(),
+            ciba_oauth_client_id: String::new(),
+        })),
     }
 }
 
@@ -4561,7 +4563,7 @@ pub struct InstanceAuthModeQuery {
     path = "/v1/env/{env_id}/app-custom-domain",
     params(("env_id" = Uuid, Path, description = "Environment ID")),
     responses(
-        (status = 200, description = "Custom domain", body = serde_json::Value),
+        (status = 200, description = "Custom domain", body = CustomDomainResponse),
         (status = 404, description = "Environment not found"),
     ),
     tag = "sys",
@@ -4571,7 +4573,7 @@ pub async fn get_app_custom_domain(
     State(state): State<AppState>,
     headers: HeaderMap,
     Path(env_id): Path<Uuid>,
-) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+) -> Result<Json<CustomDomainResponse>, (StatusCode, String)> {
     // BFF-only surface - zero-trust (sys design ). Step 5 decides:
     // the enforced scope-mirror permits `sentin8:sys:instances:read` (the
     // BFF delegator's M2M scope) and any broader sys admin scope.
@@ -4602,7 +4604,7 @@ pub async fn get_app_custom_domain(
     .unwrap_or_default();
     let _ = tx.rollback().await;
 
-    Ok(Json(serde_json::json!({ "custom_domain": subdomain })))
+    Ok(Json(CustomDomainResponse { custom_domain: subdomain }))
 }
 
 /// `GET /v1/bootstrap` - user orgs and default org.
@@ -5842,4 +5844,137 @@ pub async fn provision_env_access(
     // new env's own realm - sweep THIS process's resolver for both.
     crate::policy::invalidate_local_identity_caches([sentin8::config::SYSTEM_ENV_ID, env_id]);
     Ok(())
+}
+
+// ── Typed read-model responses (OAPEC-9: no free-form bodies) ─────────────
+
+/// The `GET /v1/scopes/catalog` payload.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
+pub struct ScopeCatalogResponse {
+    /// The platform OAuth scope strings.
+    pub scopes: Vec<String>,
+}
+
+/// The `GET /v1/env/{env_id}/auth-domain` payload.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
+pub struct AuthDomainResponse {
+    /// The env's auth_domain URL.
+    pub auth_domain: String,
+}
+
+/// The `GET /v1/env/{env_id}/app-custom-domain` payload.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
+pub struct CustomDomainResponse {
+    /// The env's custom (app) domain.
+    pub custom_domain: String,
+}
+
+/// The `GET /v1/app-instance/scopes` payload.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
+pub struct InstanceScopesResponse {
+    /// The instance's allowed OAuth scopes.
+    pub allowed_scopes: Vec<String>,
+    /// The service identities the instance may call.
+    pub allowed_services: Vec<String>,
+    /// The instance's OAuth client id (empty when unconfigured).
+    pub oauth_client_id: String,
+}
+
+/// The request body of `PUT /v1/env/{env_id}/applications/{app_id}`.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
+pub struct ApplicationUpdateRequest {
+    /// New display name (unchanged when absent).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    /// New status (unchanged when absent).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub status: Option<String>,
+}
+
+/// The caller's own service enablement inside a tenant snapshot.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
+pub struct TenantServiceEnablement {
+    /// The caller's full service identity.
+    pub service: String,
+    /// Whether the service is enabled in the target org.
+    pub enabled: bool,
+    /// The (env, service) row's config document (null when absent).
+    pub config: serde_json::Value,
+}
+
+/// The `GET /v1/tenants/{env_id}` payload (scoped tenant discovery).
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
+pub struct TenantSnapshotResponse {
+    /// Target env id.
+    pub env_id: Uuid,
+    /// Env slug.
+    pub env_slug: String,
+    /// Env display name.
+    pub env_display_name: String,
+    /// Env status.
+    pub status: String,
+    /// The env's auth domain (absolute URL; null for the default derivation).
+    pub auth_domain: Option<String>,
+    /// Owning org id.
+    pub org_id: Uuid,
+    /// Org slug.
+    pub org_slug: String,
+    /// Org display name.
+    pub org_display_name: String,
+    /// Org domain suffix.
+    pub org_domain: String,
+    /// The caller's own enablement in this tenant.
+    pub service: TenantServiceEnablement,
+}
+
+/// The `GET /v1/resolve/hostname` payload (one hostname mapping).
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
+pub struct HostnameResolveResponse {
+    /// The resolved hostname.
+    pub hostname: String,
+    /// The owning service identity.
+    pub service: String,
+    /// The org id (absent for platform-internal hosts).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub org_id: Option<String>,
+    /// The env id (absent for platform-internal hosts).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub env_id: Option<String>,
+    /// The app instance id (absent for platform/vertical service hosts).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub app_id: Option<String>,
+}
+
+/// The `GET /v1/app-instance/auth-mode` payload (BFF session binding).
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
+pub struct InstanceAuthModeResponse {
+    /// The app-instance id (empty when unresolved).
+    pub application_id: String,
+    /// The instance's org id (empty when unresolved).
+    pub org_id: String,
+    /// The instance's env id (empty when unresolved).
+    pub env_id: String,
+    /// The instance name.
+    pub instance_name: String,
+    /// The app slug.
+    pub app_slug: String,
+    /// The auth domain override.
+    pub auth_domain: String,
+    /// Whether the instance allows self-serve sign-up.
+    pub allow_signup: bool,
+    /// The group-gate mode (`strict`/`self_service`).
+    pub group_gate: String,
+    /// The instance OAuth client id.
+    pub oauth_client_id: String,
+    /// The staff-mode CIBA client id (empty when not staff-mode).
+    pub ciba_oauth_client_id: String,
+}
+
+/// The `GET /v1/readiness` payload.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
+pub struct ReadinessResponse {
+    /// `ready` when every check passes; `degraded` otherwise.
+    pub status: String,
+    /// Per-dependency check results.
+    pub checks: std::collections::BTreeMap<String, String>,
 }
