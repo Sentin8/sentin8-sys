@@ -4003,9 +4003,15 @@ pub async fn get_instance_scopes(
     .map_err(err_db)?;
     match row {
         Some(r) => Ok(Json(InstanceScopesResponse {
-            allowed_scopes: r.try_get::<Vec<String>, _>("allowed_scopes").unwrap_or_default(),
-            allowed_services: r.try_get::<Vec<String>, _>("allowed_services").unwrap_or_default(),
-            oauth_client_id: r.try_get::<String, _>("oauth_client_id").unwrap_or_default(),
+            allowed_scopes: r
+                .try_get::<Vec<String>, _>("allowed_scopes")
+                .unwrap_or_default(),
+            allowed_services: r
+                .try_get::<Vec<String>, _>("allowed_services")
+                .unwrap_or_default(),
+            oauth_client_id: r
+                .try_get::<String, _>("oauth_client_id")
+                .unwrap_or_default(),
         })),
         None => {
             tracing::warn!(%host, "sys: get_instance_scopes no instance found");
@@ -4226,22 +4232,22 @@ pub async fn get_tenant_snapshot(
         return Err(not_found());
     };
 
-        Ok(Json(TenantSnapshotResponse {
-            env_id: e_id,
-            env_slug: e_slug,
-            env_display_name: e_name,
-            status: e_status,
-            auth_domain,
-            org_id: o_id,
-            org_slug: o_slug,
-            org_display_name: o_name,
-            org_domain: o_domain,
-            service: TenantServiceEnablement {
-                service: caller_service,
-                enabled: enabled,
-                config: config,
-            },
-        }))
+    Ok(Json(TenantSnapshotResponse {
+        env_id: e_id,
+        env_slug: e_slug,
+        env_display_name: e_name,
+        status: e_status,
+        auth_domain,
+        org_id: o_id,
+        org_slug: o_slug,
+        org_display_name: o_name,
+        org_domain: o_domain,
+        service: TenantServiceEnablement {
+            service: caller_service,
+            enabled: enabled,
+            config: config,
+        },
+    }))
 }
 
 /// `GET /v1/resolve/hostname` - : the single cache-miss path for
@@ -4506,30 +4512,56 @@ pub async fn get_instance_auth_mode(
     };
     match row {
         Some(r) => Ok(Json(InstanceAuthModeResponse {
-        // Stories - full instance identity so the BFF can bind
-        // sessions to the creating app (application_id), run the
-        // auth-env match (token env vs instance env), and enforce the
-        // sentin8:app:{instance_id} group gate at callback
-        // (BFF design ; name per ).
-                   application_id: r.try_get::<Uuid, _>("id").map(|u| u.to_string()).unwrap_or_default(),
-                   org_id: r.try_get::<Uuid, _>("org_id").map(|u| u.to_string()).unwrap_or_default(),
-                   env_id: r.try_get::<Uuid, _>("env_id").map(|u| u.to_string()).unwrap_or_default(),
-                   instance_name: r.try_get::<String, _>("instance_name").unwrap_or_default(),
-                   app_slug: r.try_get::<String, _>("app_slug").unwrap_or_default(),
-                   auth_domain: r.try_get::<Option<String>, _>("auth_domain").ok().flatten().unwrap_or_default(),
-                   allow_signup: r.try_get::<bool, _>("allow_signup").unwrap_or(true),
-        // BFF F-A group-gate mode (see BFF design ): 'strict' →
-        // membership required; 'self_service' → authentication + D3
-        // auth-env match is sufficient. Defaults to 'strict' so the
-        // fail-closed rule applies to every instance that predates
-        // the column.
-                   group_gate: r.try_get::<Option<String>, _>("group_gate").ok().flatten().filter(|g| !g.is_empty()).unwrap_or_else(|| "strict".to_string()),
-                   oauth_client_id: r.try_get::<Option<String>, _>("oauth_client_id").ok().flatten().unwrap_or_default(),
-                   // Staff-mode CIBA client - the app-instance client registered
-                   // at the CUSTOMER env's auth (empty when the instance is not
-                   // staff-mode; ciba.rs falls back to oauth_client_id).
-                   ciba_oauth_client_id: r.try_get::<Option<String>, _>("ciba_oauth_client_id").ok().flatten().unwrap_or_default(),
-                       }),),
+            // Stories - full instance identity so the BFF can bind
+            // sessions to the creating app (application_id), run the
+            // auth-env match (token env vs instance env), and enforce the
+            // sentin8:app:{instance_id} group gate at callback
+            // (BFF design ; name per ).
+            application_id: r
+                .try_get::<Uuid, _>("id")
+                .map(|u| u.to_string())
+                .unwrap_or_default(),
+            org_id: r
+                .try_get::<Uuid, _>("org_id")
+                .map(|u| u.to_string())
+                .unwrap_or_default(),
+            env_id: r
+                .try_get::<Uuid, _>("env_id")
+                .map(|u| u.to_string())
+                .unwrap_or_default(),
+            instance_name: r.try_get::<String, _>("instance_name").unwrap_or_default(),
+            app_slug: r.try_get::<String, _>("app_slug").unwrap_or_default(),
+            auth_domain: r
+                .try_get::<Option<String>, _>("auth_domain")
+                .ok()
+                .flatten()
+                .unwrap_or_default(),
+            allow_signup: r.try_get::<bool, _>("allow_signup").unwrap_or(true),
+            // BFF F-A group-gate mode (see BFF design ): 'strict' →
+            // membership required; 'self_service' → authentication + D3
+            // auth-env match is sufficient. Defaults to 'strict' so the
+            // fail-closed rule applies to every instance that predates
+            // the column.
+            group_gate: r
+                .try_get::<Option<String>, _>("group_gate")
+                .ok()
+                .flatten()
+                .filter(|g| !g.is_empty())
+                .unwrap_or_else(|| "strict".to_string()),
+            oauth_client_id: r
+                .try_get::<Option<String>, _>("oauth_client_id")
+                .ok()
+                .flatten()
+                .unwrap_or_default(),
+            // Staff-mode CIBA client - the app-instance client registered
+            // at the CUSTOMER env's auth (empty when the instance is not
+            // staff-mode; ciba.rs falls back to oauth_client_id).
+            ciba_oauth_client_id: r
+                .try_get::<Option<String>, _>("ciba_oauth_client_id")
+                .ok()
+                .flatten()
+                .unwrap_or_default(),
+        })),
         None => Ok(Json(InstanceAuthModeResponse {
             application_id: String::new(),
             org_id: String::new(),
@@ -4604,7 +4636,9 @@ pub async fn get_app_custom_domain(
     .unwrap_or_default();
     let _ = tx.rollback().await;
 
-    Ok(Json(CustomDomainResponse { custom_domain: subdomain }))
+    Ok(Json(CustomDomainResponse {
+        custom_domain: subdomain,
+    }))
 }
 
 /// `GET /v1/bootstrap` - user orgs and default org.
