@@ -157,7 +157,7 @@ pub const PLATFORM_SCOPE_VOCABULARY: &[&str] = &[
     "sentin8:sys:instances:read",
     "sentin8:sys:memberships:admin",
     "sentin8:sys:steps:execute",
-    // Sys tenant-snapshot API (VDC-4, design/
+    // Sys tenant-snapshot API (design/
     // sentin8-vertical-data-plane-contract.md §VDC.5): M2M-only on-demand
     // tenant read for vertical services (initial snapshot + issuer/domain
     // derivation). Scoped discovery: the caller sees only envs where its

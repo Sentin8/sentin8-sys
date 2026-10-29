@@ -177,7 +177,7 @@ pub fn routes(
             "/v1/env/{env_id}/auth-domain",
             get(handlers::get_env_auth_domain),
         )
-        // VDC-4 (design/sentin8-vertical-data-plane-contract.md §VDC.5): the
+        // (design/sentin8-vertical-data-plane-contract.md §VDC.5): the
         // sanctioned M2M on-demand tenant read for vertical services -
         // scoped discovery answers only for envs where the caller's own
         // service is enabled.

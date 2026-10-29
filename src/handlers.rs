@@ -36,7 +36,7 @@ pub struct AppState {
     pub config: Arc<SysConfig>,
     /// The pool.
     pub pool: PgPool,
-    /// Shield engine ( - ): additional gate after scope.
+    /// Shield engine : additional gate after scope.
     /// The policy.
     pub policy: Arc<crate::policy::Engine>,
     /// The  workload registry map (boot-loaded + TTL-cached):
@@ -799,7 +799,7 @@ pub async fn create_org(
         }
     };
     set_rls_context(&mut tx, sentin8::config::SYSTEM_ENV_ID).await;
-    // VDC-3 (design/sentin8-vertical-data-plane-contract.md §VDC.4): the
+    // (design/sentin8-vertical-data-plane-contract.md §VDC.4): the
     // org lifecycle envelope is a payload-complete tenant snapshot -
     // consumers (vertical env-init, caches) act without a lookup.
     emit_sentin8_sys_event_tx(
@@ -1090,7 +1090,7 @@ pub async fn update_org(
 
     // Stories - emit sys.org.updated to system org/env, same tx.
     set_rls_context(&mut tx, sentin8::config::SYSTEM_ENV_ID).await;
-    // VDC-3: payload-complete org snapshot (see the org:created emit).
+    // payload-complete org snapshot (see the org:created emit).
     emit_sentin8_sys_event_tx(
         &mut tx,
         sentin8::config::SYSTEM_ENV_ID,
@@ -1454,7 +1454,7 @@ pub async fn create_env(
         }
     };
     set_rls_context(&mut tx, sentin8::config::SYSTEM_ENV_ID).await;
-    // VDC-3 (design/sentin8-vertical-data-plane-contract.md §VDC.4): the
+    // (design/sentin8-vertical-data-plane-contract.md §VDC.4): the
     // env lifecycle envelope is a payload-complete tenant snapshot -
     // org + env identity so consumers (fdx provider-profile derivation,
     // caches) act without a lookup.
@@ -1803,7 +1803,7 @@ pub async fn update_env(
 
     // Stories - emit sys.env.updated, same tx.
     set_rls_context(&mut tx, sentin8::config::SYSTEM_ENV_ID).await;
-    // VDC-3: payload-complete env snapshot (see the env:created emit).
+    // payload-complete env snapshot (see the env:created emit).
     let org_snapshot: Option<(String, String, String)> =
         sqlx::query_as(r#"SELECT slug, display_name, domain FROM organizations WHERE id = $1"#)
             .bind(org_id)
@@ -3473,7 +3473,7 @@ pub async fn accept_invitation(
     )
     .await;
     tx.commit().await.map_err(err_db)?;
-    // Read-your-writes (sys DESIGN §2, backlog RYW-1): acceptance just
+    // Read-your-writes (sys DESIGN §2): acceptance just
     // granted org-scoped membership in the SYSTEM env realm - sweep
     // THIS process's resolver so the member's next request (same
     // process) sees the grant without waiting for the async bus event.
@@ -4024,7 +4024,7 @@ pub async fn get_instance_scopes(
     }
 }
 
-/// `GET /v1/tenants/{env_id}` - VDC-4 tenant-snapshot API
+/// `GET /v1/tenants/{env_id}` - tenant-snapshot API
 /// (design/sentin8-vertical-data-plane-contract.md §VDC.5).
 ///
 /// The sanctioned on-demand read for a vertical service to obtain tenant
@@ -4076,7 +4076,7 @@ pub async fn get_tenant_snapshot(
     if a.claims.token_tp != "m2m" {
         return Err((
             StatusCode::FORBIDDEN,
-            "tenant snapshot is an M2M-only surface (VDC-4)".to_string(),
+            "tenant snapshot is an M2M-only surface.".to_string(),
         ));
     }
 
@@ -4088,7 +4088,7 @@ pub async fn get_tenant_snapshot(
     let mut tx = state.pool.begin().await.map_err(err_db)?;
     set_rls_context(&mut tx, sentin8::config::SYSTEM_ENV_ID).await;
 
-    // Scoped discovery (VDC-4): the caller's service identity comes from the
+    // Scoped discovery : the caller's service identity comes from the
     // verified M2M token's `service_type` claim - stamped by Auth from the
     // enroll row (workload names are inconsistent, so the registry is the
     // source of truth). Sys NEVER reads auth tables for this (sys holds no
@@ -4101,12 +4101,12 @@ pub async fn get_tenant_snapshot(
         .ok_or_else(|| {
             (
                 StatusCode::NOT_FOUND,
-                "caller token carries no service_type claim (VDC-4 scoped discovery)".to_string(),
+                "caller token carries no service_type claim (scoped discovery)"
+                    .to_string(),
             )
         })?;
 
     // Scoped discovery gate: only envs where the caller's own service is
-    // enabled answer; everything else is an indistinguishable 404 (no
     // tenant-existence oracle for foreign verticals). The services table
     // stores the SHORT leaf name (`ledger`, `fdx`) - strip the caller's
     // colon identity (`bank8:ledger` → `ledger`); a full-identity match
@@ -5823,7 +5823,7 @@ pub async fn provision_org_access(
     )
     .await?;
     tx.commit().await?;
-    // Read-your-writes (sys DESIGN §2, backlog RYW-1): the org-scoped
+    // Read-your-writes (sys DESIGN §2): the org-scoped
     // grant lives in the SYSTEM env realm - sweep THIS process's
     // resolver cache post-commit so the creator's next request (which
     // may land on the same process) sees the grant without waiting for
@@ -5873,14 +5873,14 @@ pub async fn provision_env_access(
     // no-op ON CONFLICT - the sets landed above).
     provision_env_realm_tx(&mut tx, org_id, env_id, creator_user_id).await?;
     tx.commit().await?;
-    // Read-your-writes (sys DESIGN §2, backlog RYW-1): env creation
+    // Read-your-writes (sys DESIGN §2): env creation
     // grants in BOTH the SYSTEM realm (org-scoped env access) and the
     // new env's own realm - sweep THIS process's resolver for both.
     crate::policy::invalidate_local_identity_caches([sentin8::config::SYSTEM_ENV_ID, env_id]);
     Ok(())
 }
 
-// ── Typed read-model responses (OAPEC-9: no free-form bodies) ─────────────
+// ── Typed read-model responses (no free-form bodies) ─────────────
 
 /// The `GET /v1/scopes/catalog` payload.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]

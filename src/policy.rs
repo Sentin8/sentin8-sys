@@ -29,7 +29,7 @@ pub fn engine() -> Arc<Engine> {
 
 /// Sweep THIS process's `RoleResolver` cache for every realm just
 /// granted by an org/env lifecycle or invitation-acceptance handler
-/// (sys DESIGN §2 read-your-writes; backlog RYW-1).
+/// (sys DESIGN §2 read-your-writes).
 ///
 /// The bus `identity:updated` event is the fleet-wide invalidation
 /// channel, but it is asynchronous (outbox → relay → bus → policy

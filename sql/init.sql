@@ -695,7 +695,7 @@ $func$;
 -- EXECUTE for the shared dev role + every existing and future PLATFORM
 -- service role (the dynamic loop covers late-created platform roles).
 -- Vertical services boot-load from their OWN database's substrate copy
--- (VDC-5) - the platform copy's EXECUTE stays platform-only (VDC-7).
+-- - the platform copy's EXECUTE stays platform-only .
 GRANT EXECUTE ON FUNCTION public.sentin8_boot_policy_load(TEXT) TO sentin8_app_dev;
 DO $$
 DECLARE
@@ -810,9 +810,9 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON sys.policy_principal_attrs TO sentin8_po
 -- caller's tenant; the grant only enables the engine's in-process evaluation.
 -- - no direct table grant here. Dynamic loop mirrors that function's EXECUTE
 -- loop so late-created platform roles are covered too.
--- VDC-7 (design/sentin8-vertical-data-plane-contract.md §VDC.7): PLATFORM
+-- (design/sentin8-vertical-data-plane-contract.md §VDC.7): PLATFORM
 -- roles only - a vertical domain role reads its Shield substrate from the
--- VERTICAL database's local copy (VDC-5), never from the platform tables.
+-- VERTICAL database's local copy, never from the platform tables.
 DO $$
 DECLARE
     r RECORD;
@@ -958,7 +958,7 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON sys.post_outbox TO sentin8_sys_service;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA sys TO sentin8_sys_service;
 GRANT SELECT, INSERT, UPDATE, DELETE ON sys.audit_journal TO sentin8_sys_service;
 
--- GRANT-2: runtime-registered trigger/event surfaces (sys registration.rs).
+-- runtime-registered trigger/event surfaces (sys registration.rs).
 -- These two tables are created on demand by the CLI during `vertical
 -- enroll` (they hold verticals' runtime-registered event trigger
 -- declarations and error codes; no owned DDL in sys's init) and may not
