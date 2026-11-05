@@ -173,6 +173,8 @@ CREATE TABLE IF NOT EXISTS sys.branding (
     theme_mode      TEXT NOT NULL DEFAULT '',
     custom_css      TEXT,
     sign_in_text    TEXT,
+    privacy_url     TEXT,
+    terms_url       TEXT,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
     UNIQUE (org_id, env_id, scope)

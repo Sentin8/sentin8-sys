@@ -2500,7 +2500,7 @@
         "tags": [
           "sys"
         ],
-        "summary": "`GET /v1/tenants/{env_id}` - VDC-4 tenant-snapshot API\n(design/sentin8-vertical-data-plane-contract.md §VDC.5).",
+        "summary": "`GET /v1/tenants/{env_id}` - tenant-snapshot API\n(design/sentin8-vertical-data-plane-contract.md §VDC.5).",
         "description": "The sanctioned on-demand read for a vertical service to obtain tenant\nidentity (env/org slugs, domains, auth domain) - the data fdx-style\nconsumers need to derive issuer/JWKS/callback hostnames, and the initial\nsnapshot for a vertical that boots after lifecycle events were emitted.\n\nAuthorization (three gates, all fail-closed):\n1. Bearer verify + M2M-only (`token_tp == \"m2m\"`) - user/delegated\n   tokens use the user-surface org/env APIs instead.\n2. Shield gate on `sentin8:sys:tenants:read` (grantable to workloads\n   only via `m2m_grants` - the scope lives in\n   `PLATFORM_SCOPE_VOCABULARY`, never in user role seeds).\n3. **Scoped discovery**: the caller's service identity is derived from\n   the verified `client_id` → `sys.vertical_services` registry mapping;\n   the response answers ONLY for envs where the caller's own service is\n   enabled (404 otherwise). A vertical can never enumerate tenants that\n   have not turned it on.\n\nDBX: the caller never touches `sys.*` tables - this is the owner API.\nHandle get tenant snapshot.",
         "operationId": "tenants.snapshot",
         "parameters": [
@@ -3036,12 +3036,26 @@
             ],
             "description": "The primary color."
           },
+          "privacy_url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The tenant privacy-policy link (served by the hosted UI footer)."
+          },
           "sign_in_text": {
             "type": [
               "string",
               "null"
             ],
             "description": "The sign in text."
+          },
+          "terms_url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The tenant terms-of-service link (served by the hosted UI footer)."
           },
           "theme_mode": {
             "type": "string",
@@ -4124,12 +4138,26 @@
             ],
             "description": "The primary color."
           },
+          "privacy_url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The tenant privacy-policy link (served by the hosted UI footer)."
+          },
           "sign_in_text": {
             "type": [
               "string",
               "null"
             ],
             "description": "The sign in text."
+          },
+          "terms_url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The tenant terms-of-service link (served by the hosted UI footer)."
           },
           "theme_mode": {
             "type": [

@@ -3503,6 +3503,10 @@ pub struct BrandingResponse {
     pub custom_css: Option<String>,
     /// The sign in text.
     pub sign_in_text: Option<String>,
+    /// The tenant privacy-policy link (served by the hosted UI footer).
+    pub privacy_url: Option<String>,
+    /// The tenant terms-of-service link (served by the hosted UI footer).
+    pub terms_url: Option<String>,
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
@@ -3524,6 +3528,10 @@ pub struct SetBrandingRequest {
     pub custom_css: Option<String>,
     /// The sign in text.
     pub sign_in_text: Option<String>,
+    /// The tenant privacy-policy link (served by the hosted UI footer).
+    pub privacy_url: Option<String>,
+    /// The tenant terms-of-service link (served by the hosted UI footer).
+    pub terms_url: Option<String>,
 }
 
 fn row_to_branding(row: &sqlx::postgres::PgRow) -> BrandingResponse {
@@ -3536,6 +3544,8 @@ fn row_to_branding(row: &sqlx::postgres::PgRow) -> BrandingResponse {
         theme_mode: row.get("theme_mode"),
         custom_css: row.get("custom_css"),
         sign_in_text: row.get("sign_in_text"),
+        privacy_url: row.get("privacy_url"),
+        terms_url: row.get("terms_url"),
     }
 }
 
@@ -3568,7 +3578,7 @@ pub async fn get_org_branding(
     .await?;
     authorize_org(&a, org_id, &state.pool).await?;
     let row = sqlx::query(
-        r#"SELECT logo_url, logo_icon_url, primary_color, accent_color, font_family, theme_mode, custom_css, sign_in_text
+        r#"SELECT logo_url, logo_icon_url, primary_color, accent_color, font_family, theme_mode, custom_css, sign_in_text, privacy_url, terms_url
            FROM branding WHERE org_id = $1 AND env_id IS NULL AND scope = 'org'"#,
     )
     .bind(org_id)
@@ -3585,6 +3595,8 @@ pub async fn get_org_branding(
             theme_mode: String::new(),
             custom_css: None,
             sign_in_text: None,
+            privacy_url: None,
+            terms_url: None,
         },
     )))
 }
@@ -3627,18 +3639,20 @@ pub async fn set_org_branding(
     let mut tx = state.pool.begin().await.map_err(err_db)?;
     set_rls_context(&mut tx, sentin8::config::SYSTEM_ENV_ID).await;
     let row = sqlx::query(
-        r#"INSERT INTO branding (org_id, env_id, scope, logo_url, logo_icon_url, primary_color, accent_color, font_family, theme_mode, custom_css, sign_in_text)
-           VALUES ($1, NULL, 'org', $2, $3, $4, $5, $6, COALESCE($7, ''), $8, $9)
+        r#"INSERT INTO branding (org_id, env_id, scope, logo_url, logo_icon_url, primary_color, accent_color, font_family, theme_mode, custom_css, sign_in_text, privacy_url, terms_url)
+           VALUES ($1, NULL, 'org', $2, $3, $4, $5, $6, COALESCE($7, ''), $8, $9, $10, $11)
            ON CONFLICT (org_id, env_id, scope)
            DO UPDATE SET logo_url = EXCLUDED.logo_url, logo_icon_url = EXCLUDED.logo_icon_url,
               primary_color = EXCLUDED.primary_color, accent_color = EXCLUDED.accent_color,
               font_family = EXCLUDED.font_family, theme_mode = EXCLUDED.theme_mode,
-              custom_css = EXCLUDED.custom_css, sign_in_text = EXCLUDED.sign_in_text, updated_at = now()
-           RETURNING logo_url, logo_icon_url, primary_color, accent_color, font_family, theme_mode, custom_css, sign_in_text"#,
+              custom_css = EXCLUDED.custom_css, sign_in_text = EXCLUDED.sign_in_text,
+              privacy_url = EXCLUDED.privacy_url, terms_url = EXCLUDED.terms_url, updated_at = now()
+           RETURNING logo_url, logo_icon_url, primary_color, accent_color, font_family, theme_mode, custom_css, sign_in_text, privacy_url, terms_url"#,
     )
     .bind(org_id)
     .bind(&req.logo_url).bind(&req.logo_icon_url).bind(&req.primary_color).bind(&req.accent_color)
     .bind(&req.font_family).bind(req.theme_mode.as_deref().unwrap_or("")).bind(&req.custom_css).bind(&req.sign_in_text)
+    .bind(&req.privacy_url).bind(&req.terms_url)
     .fetch_one(&mut *tx).await.map_err(err_db)?;
     audit_tx(&mut tx, &a, "update", "branding", "org", None, None).await;
     // Stories - emit sys.branding.org.updated, same tx.
@@ -3685,7 +3699,7 @@ pub async fn get_env_branding(
     let org_id = resolve_org_id(&state.pool, env_id).await?;
     authorize_org(&a, org_id, &state.pool).await?;
     let row = sqlx::query(
-        r#"SELECT logo_url, logo_icon_url, primary_color, accent_color, font_family, theme_mode, custom_css, sign_in_text
+        r#"SELECT logo_url, logo_icon_url, primary_color, accent_color, font_family, theme_mode, custom_css, sign_in_text, privacy_url, terms_url
            FROM branding WHERE org_id = $1 AND env_id = $2 AND scope = 'env'"#,
     )
     .bind(org_id).bind(env_id)
@@ -3700,6 +3714,8 @@ pub async fn get_env_branding(
             theme_mode: String::new(),
             custom_css: None,
             sign_in_text: None,
+            privacy_url: None,
+            terms_url: None,
         },
     )))
 }
@@ -3740,18 +3756,20 @@ pub async fn set_env_branding(
     let mut tx = state.pool.begin().await.map_err(err_db)?;
     set_rls_context(&mut tx, env_id).await;
     let row = sqlx::query(
-        r#"INSERT INTO branding (org_id, env_id, scope, logo_url, logo_icon_url, primary_color, accent_color, font_family, theme_mode, custom_css, sign_in_text)
-           VALUES ($1, $2, 'env', $3, $4, $5, $6, $7, COALESCE($8, ''), $9, $10)
+        r#"INSERT INTO branding (org_id, env_id, scope, logo_url, logo_icon_url, primary_color, accent_color, font_family, theme_mode, custom_css, sign_in_text, privacy_url, terms_url)
+           VALUES ($1, $2, 'env', $3, $4, $5, $6, $7, COALESCE($8, ''), $9, $10, $11, $12)
            ON CONFLICT (org_id, env_id, scope)
            DO UPDATE SET logo_url = EXCLUDED.logo_url, logo_icon_url = EXCLUDED.logo_icon_url,
               primary_color = EXCLUDED.primary_color, accent_color = EXCLUDED.accent_color,
               font_family = EXCLUDED.font_family, theme_mode = EXCLUDED.theme_mode,
-              custom_css = EXCLUDED.custom_css, sign_in_text = EXCLUDED.sign_in_text, updated_at = now()
-           RETURNING logo_url, logo_icon_url, primary_color, accent_color, font_family, theme_mode, custom_css, sign_in_text"#,
+              custom_css = EXCLUDED.custom_css, sign_in_text = EXCLUDED.sign_in_text,
+              privacy_url = EXCLUDED.privacy_url, terms_url = EXCLUDED.terms_url, updated_at = now()
+           RETURNING logo_url, logo_icon_url, primary_color, accent_color, font_family, theme_mode, custom_css, sign_in_text, privacy_url, terms_url"#,
     )
     .bind(org_id).bind(env_id)
     .bind(&req.logo_url).bind(&req.logo_icon_url).bind(&req.primary_color).bind(&req.accent_color)
     .bind(&req.font_family).bind(req.theme_mode.as_deref().unwrap_or("")).bind(&req.custom_css).bind(&req.sign_in_text)
+    .bind(&req.privacy_url).bind(&req.terms_url)
     .fetch_one(&mut *tx).await.map_err(err_db)?;
     audit_tx(&mut tx, &a, "update", "branding", "env", None, None).await;
     // Stories - emit sys.branding.env.updated, same tx.
@@ -3797,12 +3815,12 @@ pub async fn get_merged_branding(
     let org_id = resolve_org_id(&state.pool, env_id).await?;
     authorize_org(&a, org_id, &state.pool).await?;
     let org_row = sqlx::query(
-        r#"SELECT logo_url, logo_icon_url, primary_color, accent_color, font_family, theme_mode, custom_css, sign_in_text
+        r#"SELECT logo_url, logo_icon_url, primary_color, accent_color, font_family, theme_mode, custom_css, sign_in_text, privacy_url, terms_url
            FROM branding WHERE org_id = $1 AND env_id IS NULL AND scope = 'org'"#,
     )
     .bind(org_id).fetch_optional(&state.pool).await.map_err(err_db)?;
     let env_row = sqlx::query(
-        r#"SELECT logo_url, logo_icon_url, primary_color, accent_color, font_family, theme_mode, custom_css, sign_in_text
+        r#"SELECT logo_url, logo_icon_url, primary_color, accent_color, font_family, theme_mode, custom_css, sign_in_text, privacy_url, terms_url
            FROM branding WHERE org_id = $1 AND env_id = $2 AND scope = 'env'"#,
     )
     .bind(org_id).bind(env_id).fetch_optional(&state.pool).await.map_err(err_db)?;
@@ -3832,6 +3850,8 @@ pub async fn get_merged_branding(
         },
         custom_css: pick(get_str(env, "custom_css"), get_str(org, "custom_css")),
         sign_in_text: pick(get_str(env, "sign_in_text"), get_str(org, "sign_in_text")),
+        privacy_url: pick(get_str(env, "privacy_url"), get_str(org, "privacy_url")),
+        terms_url: pick(get_str(env, "terms_url"), get_str(org, "terms_url")),
     }))
 }
 

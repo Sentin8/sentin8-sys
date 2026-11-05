@@ -213,6 +213,16 @@ erDiagram
         uuid org_id FK
         uuid env_id FK
         text scope "org|env"
+        text logo_url
+        text logo_icon_url
+        text primary_color
+        text accent_color
+        text font_family
+        text theme_mode
+        text custom_css
+        text sign_in_text
+        text privacy_url
+        text terms_url
     }
     OUTBOX {
         uuid id PK
