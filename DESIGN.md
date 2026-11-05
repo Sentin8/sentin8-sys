@@ -488,6 +488,23 @@ graph LR
 8. **Resolver endpoints are read-only** and scoped to
    `sys:instances:read` - tenant resolution data cannot be mutated
    through them.
+8b. **`GET /v1/resolve/hostname` fails closed on an
+   unresolvable env.** The org-domain pattern path
+   (`{service}.{env_slug}.{org_domain}`) answers ONLY when the env row
+   exists: when the org matches but the `environments` lookup misses,
+   the hostname is NOT resolvable (404 with the slug in the message) -
+   never an org-only mapping with `env_id` omitted. The consumer
+   contract (the SDK `HostContextResolver`) substitutes the SYSTEM env
+   for a missing `env_id` and caches the result with no invalidation, so
+   an org-only answer silently pins a tenant hostname to the platform
+   plane (the observed rig failure: `auth.cert-haip` resolved to the
+   SYSTEM env from its pre-provisioning TLS warm-up and served the
+   platform ML-DSA family instead of the tenant's ES256 until an auth
+   restart). A 404 keeps the tenant miss un-cached and the next request
+   re-resolves once the env exists (plus the SDK-side tenant-plane
+   cache TTL - sentin8-tls README §6).
+   The `ops`-slug system-env branch (a real env by construction) is
+   unaffected.
 9. **`authorize_org` reads group names** (auth's
    `GET /v1/admin/users/{id}/groups`): provisioning assigns the creator
    to the group `sentin8:org:{org_id}:owners` - the UUID-embedded

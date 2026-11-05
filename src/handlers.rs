@@ -4384,6 +4384,20 @@ pub async fn resolve_hostname(
             .await
             .map_err(err_db)?
         };
+        // Fail closed (DESIGN §8 invariant 8b): the org matched but
+        // the env slug has NO row - the hostname is NOT resolvable. An
+        // org-only answer with env_id omitted would pin the consumer
+        // (the SDK HostContextResolver substitutes the SYSTEM env for a
+        // missing env_id and caches it) to the platform plane until a
+        // service restart. Fail closed: 404, never a placeholder env.
+        if env_id.is_none() {
+            return Err((
+                StatusCode::NOT_FOUND,
+                format!(
+                    "hostname {host:?} not resolvable (org matched, env slug '{env_slug}' has no row)"
+                ),
+            ));
+        }
         // Resolve the service_type from the hostname label via the runtime
         // subdomain registry (sentin8-config - single source of truth).
         let subdomain_map = sentin8::config::Sentin8Config::from_env()

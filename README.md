@@ -103,7 +103,10 @@ validation via auth's owner API), not by widening RLS.
 - **Branding**: org base + env override + merged view
   (`/v1/env/{env_id}/branding/merged`).
 - **Resolver**: `GET /v1/resolve/hostname` - hostname → org/env/app
-  instance (BFF, Auth, TLS all consume this).
+  instance (BFF, Auth, TLS all consume this). Fails closed (404) when
+  the env slug has no row - never an org-only answer with a missing
+  `env_id` (the SDK consumer would pin the SYSTEM env and cache it;
+  DESIGN §8).
 - **Bootstrap**: `GET /v1/bootstrap` - the dash's first-screen data
   (orgs the caller can reach, computed via auth's live group listing).
 - **Audit**: `POST /v1/audit` (service ingest → canonical rows + local
