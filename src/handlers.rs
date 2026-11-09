@@ -4201,10 +4201,19 @@ pub async fn get_tenant_snapshot(
     // indistinguishable. The `config` column rides the exact
     // (env, service) row when it exists (the requested env's own config);
     // the org-scope rows only establish enablement.
+    // The stored name form is ENABLER-DEPENDENT and the platform stays
+    // agnostic about it: vertical enablement rows are written by tenant
+    // operators/registries in any of three spellings - the short leaf
+    // (`ledger`), the dash subdomain form (`openfin8-ca`), or the full
+    // colon identity (`openfin8:ca`) - all naming the same service. The
+    // gate accepts whichever the (org env) row carries: a vertical
+    // whose service_type leaf collides with a DIFFERENT vertical's
+    // enablement row is not a realistic hazard (the rows are per-org and
+    // operator-written for that org's own verticals).
     let enabled_row: Option<(bool, serde_json::Value)> = sqlx::query_as(
         r#"SELECT s.enabled, s.config
              FROM services s
-            WHERE s.service = $2
+            WHERE s.service = ANY($2)
               AND s.env_id IN (SELECT org_envs.id FROM environments req_env
                                 JOIN environments org_envs
                                   ON org_envs.org_id = req_env.org_id
@@ -4213,7 +4222,11 @@ pub async fn get_tenant_snapshot(
             LIMIT 1"#,
     )
     .bind(env_id)
-    .bind(caller_leaf)
+    .bind(vec![
+        caller_leaf.to_string(),
+        caller_service.replace(':', "-"),
+        caller_service.to_string(),
+    ])
     .fetch_optional(&mut *tx)
     .await
     .map_err(err_db)?;
