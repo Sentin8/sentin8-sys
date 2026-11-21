@@ -937,9 +937,9 @@ pub async fn list_orgs(
                  AND o.id = ANY($4)
                ORDER BY o.created_at DESC LIMIT $2 OFFSET $1"#,
         )
+        .bind(offset)
         .bind(limit)
         .bind(sentin8::config::SYSTEM_ORG_ID)
-        .bind(offset)
         .bind(member_org_ids)
         .fetch_all(&mut *tx)
         .await
