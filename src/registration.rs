@@ -116,6 +116,7 @@ pub fn print(section: Option<String>) -> anyhow::Result<()> {
         service_type: "sentin8:sys",
         subdomain: "sys",
         health_path: "/v1/health",
+        exposure: "",
         admin_scopes: &[
             AdminScope::Tuple("sentin8:sys:admin", "sentin8:sys:admin"),
             // Policy-admin surface (policy design ; per-service scope).
